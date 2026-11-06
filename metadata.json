@@ -1,0 +1,6 @@
+{
+  "name": "YouConnect",
+  "description": "Privacy-first, AI-augmented virtual business cards with P2P radar networking, NFC/QR sharing, and intelligent contact CRM.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

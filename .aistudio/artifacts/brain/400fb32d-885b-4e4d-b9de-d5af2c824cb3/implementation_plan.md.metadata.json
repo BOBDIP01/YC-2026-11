@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan to rename Studio to Card Hub, replace stacked nested sub-menus with a single-level collapsible accordion workspace, and introduce a compact sticky mobile mini-card bar that expands full-screen on tap while keeping the side-by-side layout on desktop.",
+  "updatedAt": "2026-11-05T08:22:54.506581152Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

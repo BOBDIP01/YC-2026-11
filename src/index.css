@@ -1,0 +1,337 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-serif: 'Playfair Display', Georgia, serif;
+    --font-grotesk: 'Space Grotesk', system-ui, sans-serif;
+    --font-couture: 'Cormorant Garamond', Georgia, serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-syne: 'Syne', system-ui, sans-serif;
+    --font-bodoni: 'Bodoni Moda', Georgia, serif;
+    --font-outfit: 'Outfit', system-ui, sans-serif;
+    --font-cinzel: 'Cinzel', Georgia, serif;
+    --font-sora: 'Sora', system-ui, sans-serif;
+  }
+
+  html,
+  body {
+    font-family: var(--font-sans);
+    background-color: #090D16;
+    color: #F8FAFC;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* =========================================================================
+   DAY APPEARANCE MODE (Light Theme Shell Override)
+   Preserves bespoke luxury themes inside .digital-card-preserve
+   ========================================================================= */
+html.theme-day body {
+  background-color: #F1F5F9;
+  color: #0F172A;
+}
+
+html.theme-day .bg-\[\#090D16\],
+html.theme-day .bg-\[\#070B14\],
+html.theme-day .bg-\[\#070B14\]\/90,
+html.theme-day [class^="bg-[#0"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" bg-[#0"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class^="bg-[#1"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" bg-[#1"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+
+/* Match ALL opacity variants of bg-slate-950 (/95, /90, /85, /80, /75, /70, /60, /50, /40, /30, etc.) */
+html.theme-day [class^="bg-slate-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" bg-slate-950"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  background-color: #FFFFFF !important;
+}
+
+/* Match ALL opacity variants of bg-slate-900 (/95, /90, /85, /80, /75, /70, /60, /50, /40, /30, etc.) */
+html.theme-day [class^="bg-slate-900"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" bg-slate-900"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  background-color: #F8FAFC !important;
+}
+
+/* Match ALL opacity variants of bg-slate-800 */
+html.theme-day [class^="bg-slate-800"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" bg-slate-800"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class^="bg-slate-700"]:not(.digital-card-preserve):not(.digital-card-preserve *):not(span.h-2\.5),
+html.theme-day [class*=" bg-slate-700"]:not(.digital-card-preserve):not(.digital-card-preserve *):not(span.h-2\.5) {
+  background-color: #E2E8F0 !important;
+}
+
+/* Hover states for slate buttons & cards in Day Mode */
+html.theme-day [class*="hover:bg-slate-900"]:not(.digital-card-preserve):not(.digital-card-preserve *):hover,
+html.theme-day [class*="hover:bg-slate-800"]:not(.digital-card-preserve):not(.digital-card-preserve *):hover,
+html.theme-day [class*="hover:bg-slate-700"]:not(.digital-card-preserve):not(.digital-card-preserve *):hover {
+  background-color: #E2E8F0 !important;
+}
+
+html.theme-day [class^="from-slate-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" from-slate-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class^="from-slate-900"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" from-slate-900"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  --tw-gradient-from: #FFFFFF !important;
+}
+
+html.theme-day [class^="via-slate-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" via-slate-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class^="via-slate-900"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" via-slate-900"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  --tw-gradient-via: #F8FAFC !important;
+}
+
+html.theme-day [class^="to-slate-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" to-slate-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class^="to-slate-900"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" to-slate-900"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  --tw-gradient-to: #F1F5F9 !important;
+}
+
+/* Match ALL opacity variants of border-slate-800 and border-slate-700 */
+html.theme-day [class^="border-slate-800"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" border-slate-800"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class^="border-slate-700"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" border-slate-700"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  border-color: #CBD5E1 !important;
+}
+
+html.theme-day .divide-slate-800\/60:not(.digital-card-preserve):not(.digital-card-preserve *) > :not([hidden]) ~ :not([hidden]) {
+  border-color: #E2E8F0 !important;
+}
+
+/* High-contrast readable dark typography on ALL light Day Mode surfaces */
+html.theme-day .text-white:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day .text-slate-100:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day .text-slate-200:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  color: #0F172A !important;
+}
+
+html.theme-day .text-slate-300:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  color: #1E293B !important;
+}
+
+html.theme-day .text-slate-400:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day .text-slate-500:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  color: #475569 !important;
+}
+
+/* Match ALL opacity variants of tinted 950 backgrounds (Selected / Active cards & pills) */
+html.theme-day [class^="bg-indigo-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" bg-indigo-950"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  background-color: #E0E7FF !important;
+  color: #0F172A !important;
+}
+
+html.theme-day [class^="bg-emerald-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" bg-emerald-950"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  background-color: #D1FAE5 !important;
+  color: #0F172A !important;
+}
+
+html.theme-day [class^="bg-cyan-950"]:not(.digital-card-preserve):not(.digital-card-preserve *):not(span.h-2\.5),
+html.theme-day [class*=" bg-cyan-950"]:not(.digital-card-preserve):not(.digital-card-preserve *):not(span.h-2\.5) {
+  background-color: #CFFAFE !important;
+  color: #0F172A !important;
+}
+
+html.theme-day [class^="bg-amber-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" bg-amber-950"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  background-color: #FEF3C7 !important;
+  color: #0F172A !important;
+}
+
+html.theme-day [class^="bg-rose-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" bg-rose-950"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  background-color: #FFE4E6 !important;
+  color: #0F172A !important;
+}
+
+html.theme-day [class^="bg-purple-950"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" bg-purple-950"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  background-color: #F3E8FF !important;
+  color: #0F172A !important;
+}
+
+/* Crisp selected borders in Day Mode */
+html.theme-day [class^="border-amber-400"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" border-amber-400"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class^="border-amber-500"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" border-amber-500"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  border-color: #D97706 !important;
+}
+
+html.theme-day [class^="border-indigo-400"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" border-indigo-400"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class^="border-indigo-500"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" border-indigo-500"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  border-color: #4F46E5 !important;
+}
+
+html.theme-day [class^="border-cyan-400"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" border-cyan-400"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class^="border-cyan-500"]:not(.digital-card-preserve):not(.digital-card-preserve *),
+html.theme-day [class*=" border-cyan-500"]:not(.digital-card-preserve):not(.digital-card-preserve *) {
+  border-color: #0891B2 !important;
+}
+
+/* High-contrast accent text colors in Day Mode */
+html.theme-day .text-indigo-200:not(.digital-card-preserve *):not([class*="bg-black/"]),
+html.theme-day .text-indigo-300:not(.digital-card-preserve *),
+html.theme-day .text-indigo-400:not(.digital-card-preserve *) {
+  color: #3730A3 !important;
+}
+
+html.theme-day .text-cyan-200:not(.digital-card-preserve *):not([class*="bg-black/"]),
+html.theme-day .text-cyan-300:not(.digital-card-preserve *),
+html.theme-day .text-cyan-400:not(.digital-card-preserve *) {
+  color: #0E7490 !important;
+}
+
+html.theme-day .text-emerald-200:not(.digital-card-preserve *),
+html.theme-day .text-emerald-300:not(.digital-card-preserve *),
+html.theme-day .text-emerald-400:not(.digital-card-preserve *) {
+  color: #047857 !important;
+}
+
+html.theme-day .text-amber-200:not(.digital-card-preserve *):not([class*="bg-black/"]),
+html.theme-day .text-amber-300:not(.digital-card-preserve *),
+html.theme-day .text-amber-400:not(.digital-card-preserve *) {
+  color: #B45309 !important;
+}
+
+html.theme-day .text-rose-200:not(.digital-card-preserve *),
+html.theme-day .text-rose-300:not(.digital-card-preserve *),
+html.theme-day .text-rose-400:not(.digital-card-preserve *) {
+  color: #BE123C !important;
+}
+
+html.theme-day .text-purple-200:not(.digital-card-preserve *),
+html.theme-day .text-purple-300:not(.digital-card-preserve *),
+html.theme-day .text-purple-400:not(.digital-card-preserve *) {
+  color: #6D28D9 !important;
+}
+
+/* Preserve white text ONLY on solid 600/500 filled primary action buttons & dark photo overlays */
+html.theme-day .bg-indigo-600:not(.digital-card-preserve *),
+html.theme-day .bg-indigo-600:not(.digital-card-preserve *) *,
+html.theme-day .bg-indigo-500:not(.digital-card-preserve *),
+html.theme-day .bg-indigo-500:not(.digital-card-preserve *) *,
+html.theme-day .bg-emerald-600:not(.digital-card-preserve *),
+html.theme-day .bg-emerald-600:not(.digital-card-preserve *) *,
+html.theme-day .bg-cyan-600:not(.digital-card-preserve *),
+html.theme-day .bg-cyan-600:not(.digital-card-preserve *) *,
+html.theme-day .bg-rose-600:not(.digital-card-preserve *),
+html.theme-day .bg-rose-600:not(.digital-card-preserve *) *,
+html.theme-day .bg-amber-600:not(.digital-card-preserve *),
+html.theme-day .bg-amber-600:not(.digital-card-preserve *) *,
+html.theme-day .from-indigo-600:not(.digital-card-preserve *),
+html.theme-day .from-indigo-600:not(.digital-card-preserve *) *,
+html.theme-day .from-cyan-600:not(.digital-card-preserve *),
+html.theme-day .from-cyan-600:not(.digital-card-preserve *) *,
+html.theme-day .from-emerald-600:not(.digital-card-preserve *),
+html.theme-day .from-emerald-600:not(.digital-card-preserve *) * {
+  color: #FFFFFF !important;
+}
+
+/* Preserve readable white/light labels over photo thumbnail dark gradient overlays */
+html.theme-day [class*="from-black/8"] ~ div .text-white,
+html.theme-day [class*="from-black/9"] ~ div .text-white,
+html.theme-day [class*="bg-black/7"] .text-white,
+html.theme-day [class*="bg-black/8"] .text-white,
+html.theme-day [class*="bg-black/8"] {
+  color: #FFFFFF !important;
+}
+
+.font-card-sans {
+  font-family: var(--font-sans);
+}
+.font-card-serif {
+  font-family: var(--font-serif);
+}
+.font-card-grotesk {
+  font-family: var(--font-grotesk);
+  letter-spacing: -0.015em;
+}
+.font-card-couture {
+  font-family: var(--font-couture);
+  letter-spacing: 0.01em;
+}
+.font-card-mono {
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+}
+.font-card-syne {
+  font-family: var(--font-syne);
+  letter-spacing: -0.02em;
+}
+.font-card-bodoni {
+  font-family: var(--font-bodoni);
+  letter-spacing: 0.01em;
+}
+.font-card-outfit {
+  font-family: var(--font-outfit);
+  letter-spacing: -0.01em;
+}
+.font-card-cinzel {
+  font-family: var(--font-cinzel);
+  letter-spacing: 0.03em;
+}
+.font-card-sora {
+  font-family: var(--font-sora);
+  letter-spacing: -0.02em;
+}
+
+/* Custom radar pulse & sweep keyframes */
+@keyframes radar-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-radar-sweep {
+  animation: radar-sweep 4s linear infinite;
+}
+
+/* Hide ugly scrollbars while preserving smooth scroll where needed */
+.scrollbar-thin,
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-thin::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Subtle dark vertical scrollbar only */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 0px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
