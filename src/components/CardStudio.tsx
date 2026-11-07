@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { MasterProfile, DigitalCard, CardTheme, CardMaterial, CardLayoutMode, CRMContact, ProfileCategory, CardVisibleFields, PrimaryCtaType, StoredPicture, SubscriptionState, AiUsageType } from '../types';
 import { generateVCardString, downloadVCard } from '../utils/vcard';
 import { getCardPublicUrl, getCardDisplayUrl, publishCardToServer } from '../utils/urlHelper';
+import { apiFetch } from '../utils/apiConfig';
 import { PROFILE_CATEGORIES, COVER_BANNER_PRESETS, LandscapePresetCategory, PERSONA_PRESETS } from '../data/presets';
 import { extractPersonSilhouetteCutout } from '../utils/silhouetteExtractor';
 import { enhancePhotoWithAI, AvatarStyle } from '../utils/aiPhotoEnhancer';
@@ -212,7 +213,8 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   >([]);
   const [enlargedPreviewImage, setEnlargedPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'profile' | 'images' | 'card' | 'fields'>('profile');
-  const [isMobilePreviewModalOpen, setIsMobilePreviewModalOpen] = useState(false);
+  const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
+  const mobileEditorSectionRef = useRef<HTMLDivElement | null>(null);
   const [openAccordions, setOpenAccordions] = useState<{
     personal: boolean;
     work: boolean;
@@ -223,7 +225,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
     theme: boolean;
     sharing: boolean;
   }>({
-    personal: true,
+    personal: false,
     work: false,
     beyond: false,
     socials: false,
@@ -232,6 +234,25 @@ export const CardStudio: React.FC<CardStudioProps> = ({
     theme: false,
     sharing: false,
   });
+
+  const handleRecallMobileSection = (sectionKey?: keyof typeof openAccordions) => {
+    setIsMobileEditorOpen(true);
+    if (sectionKey) {
+      setOpenAccordions({
+        personal: sectionKey === 'personal',
+        work: sectionKey === 'work',
+        beyond: sectionKey === 'beyond',
+        socials: sectionKey === 'socials',
+        portrait: sectionKey === 'portrait',
+        background: sectionKey === 'background',
+        theme: sectionKey === 'theme',
+        sharing: sectionKey === 'sharing',
+      });
+    }
+    window.setTimeout(() => {
+      mobileEditorSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  };
 
   const toggleAccordion = (key: keyof typeof openAccordions) => {
     setOpenAccordions((prev) => {
@@ -411,7 +432,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
       try {
         let finalHeadshotUrl: string | null = null;
         try {
-          const res = await fetch('/api/ai/avatar', {
+          const res = await apiFetch('/api/ai/avatar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -477,7 +498,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
 
     // Track B: 3D & Stylized Character Avatar Presets
     try {
-      const res = await fetch('/api/ai/avatar-3d', {
+      const res = await apiFetch('/api/ai/avatar-3d', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -646,7 +667,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
     }
     setIsGeneratingBrandLogo(true);
     try {
-      const res = await fetch('/api/ai/logo', {
+      const res = await apiFetch('/api/ai/logo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1092,7 +1113,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
 
     setIsGeneratingInlineBanner(true);
     try {
-      const res = await fetch('/api/ai/banner', {
+      const res = await apiFetch('/api/ai/banner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1139,7 +1160,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[1720px] px-3 sm:px-6 lg:px-8 xl:px-10 py-5 sm:py-7">
       {/* Sticky Compact Mini-Card Bar on Mobile (< lg) & Top Card Bar on Desktop */}
       <div className="sticky top-13 sm:top-15 z-30 lg:static lg:z-40 mb-5 rounded-2xl border border-slate-800 bg-slate-900/95 p-2.5 sm:p-3 backdrop-blur-xl flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 shadow-xl">
         {/* Left: Active Card Dropdown Selector */}
@@ -1281,17 +1302,37 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           )}
         </div>
 
-        {/* Right: Mobile Live Card Preview Button + Quick Card Actions */}
+        {/* Right: Mobile Recall Editor Menus Button + Quick Card Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Mobile (< lg) Full-Screen Live Card Preview Trigger */}
+          {/* Mobile (< lg) Recall / Hide Edit Menus Trigger (Card is always primary display) */}
           <button
             type="button"
-            onClick={() => setIsMobilePreviewModalOpen(true)}
-            className="lg:hidden h-9 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition shrink-0"
-            title="Open Full-Screen Live Card Preview (3D Card, Story Deck & Pass)"
+            onClick={() => {
+              if (!isMobileEditorOpen) {
+                handleRecallMobileSection();
+              } else {
+                setIsMobileEditorOpen(false);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }}
+            className={`lg:hidden h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition shrink-0 ${
+              isMobileEditorOpen
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20'
+                : 'bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-95 text-white shadow-indigo-500/20'
+            }`}
+            title={isMobileEditorOpen ? 'Hide Edit Menus and Return to Card' : 'Recall Menus to Fill & Customize Card Data'}
           >
-            <Eye className="h-3.5 w-3.5 shrink-0" />
-            <span>Preview Card</span>
+            {isMobileEditorOpen ? (
+              <>
+                <Check className="h-3.5 w-3.5 shrink-0" />
+                <span>Done Editing</span>
+              </>
+            ) : (
+              <>
+                <Sliders className="h-3.5 w-3.5 shrink-0" />
+                <span>Edit Card</span>
+              </>
+            )}
           </button>
 
           {/* Integrated Public Handle & Copy Link Pill (Desktop) */}
@@ -1322,14 +1363,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
 
           <button
             type="button"
-            onClick={() => {
-              if (window.innerWidth < 1024) {
-                setIsQrNfcPanelOpen(true);
-                setIsMobilePreviewModalOpen(true);
-              } else {
-                setIsQrNfcPanelOpen((prev) => !prev);
-              }
-            }}
+            onClick={() => setIsQrNfcPanelOpen((prev) => !prev)}
             className={`h-9 w-9 rounded-xl border flex items-center justify-center transition shadow-sm shrink-0 ${
               isQrNfcPanelOpen
                 ? 'border-indigo-400 bg-indigo-600 text-white shadow-indigo-500/30'
@@ -1397,10 +1431,10 @@ export const CardStudio: React.FC<CardStudioProps> = ({
         </div>
       </div>
 
-      {/* Main Card Hub Grid: Left Live Card Display (Desktop Side-by-Side) & Right Single-Level Accordion Workspace */}
+      {/* Main Card Hub Grid: Live Card ALWAYS Primary in View + On-Demand Edit Menus on Mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-        {/* LEFT COLUMN (Desktop >= lg): Sticky 3D Virtual Card & On-Demand Sharing Actions (5 cols) */}
-        <div className="hidden lg:block lg:col-span-5 lg:sticky lg:top-20 space-y-4">
+        {/* LEFT COLUMN (Always visible on Phone & Desktop): Live 3D Virtual Card & On-Demand Sharing Actions */}
+        <div className="block lg:col-span-5 lg:sticky lg:top-20 space-y-4">
           {/* Interactive Luxury Digital Card Display (3D Flip, Bento Hub, Wallet Pass) */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-3.5 sm:p-5 shadow-xl backdrop-blur-md">
             <DigitalCardRenderer
@@ -1410,6 +1444,65 @@ export const CardStudio: React.FC<CardStudioProps> = ({
               onAddContactToCRM={onAddContactToCRM}
               interactive={true}
             />
+          </div>
+
+          {/* Mobile (< lg) Quick-Recall Menu Dock: Keep Card Primary, Recall Data Menus on Demand */}
+          <div className="lg:hidden rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-3 shadow-lg backdrop-blur-md">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Sliders className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                  <span>Fill & Customize Card Data</span>
+                </span>
+                <p className="text-[11px] text-slate-400 truncate">
+                  Tap a menu below to edit your card details
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMobileEditorOpen((prev) => !prev)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
+                  isMobileEditorOpen
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm'
+                }`}
+              >
+                {isMobileEditorOpen ? 'Hide Menus' : 'All Menus'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1.5">
+              {(
+                [
+                  { key: 'personal', label: 'Identity', icon: User, color: 'text-rose-400' },
+                  { key: 'work', label: 'Work', icon: Briefcase, color: 'text-indigo-400' },
+                  { key: 'beyond', label: 'Passions', icon: Sparkles, color: 'text-amber-400' },
+                  { key: 'socials', label: 'Socials', icon: Globe, color: 'text-cyan-400' },
+                  { key: 'portrait', label: 'Portrait', icon: Camera, color: 'text-purple-400' },
+                  { key: 'background', label: 'Cover', icon: Image, color: 'text-teal-400' },
+                  { key: 'theme', label: 'Theme', icon: Palette, color: 'text-amber-300' },
+                  { key: 'sharing', label: 'Visibility', icon: Eye, color: 'text-emerald-400' },
+                ] as const
+              ).map((item) => {
+                const IconComp = item.icon;
+                const isActiveSection = isMobileEditorOpen && openAccordions[item.key];
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => handleRecallMobileSection(item.key)}
+                    className={`flex flex-col items-center justify-center gap-1 py-2 px-1.5 rounded-xl border text-[11px] font-semibold transition ${
+                      isActiveSection
+                        ? 'border-indigo-500 bg-indigo-950/60 text-white shadow-sm'
+                        : 'border-slate-800 bg-slate-950/70 hover:bg-slate-800/70 text-slate-300'
+                    }`}
+                  >
+                    <IconComp className={`h-3.5 w-3.5 ${item.color}`} />
+                    <span className="truncate max-w-full">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Quick Sharing Modalities: QR & NFC Card Box (Opened when Share icon is selected) */}
@@ -1601,7 +1694,10 @@ export const CardStudio: React.FC<CardStudioProps> = ({
         </div>
 
         {/* RIGHT COLUMN: Single-Level Collapsible Accordion Workspace (7 cols) */}
-        <div className="lg:col-span-7 space-y-3">
+        <div
+          ref={mobileEditorSectionRef}
+          className={`${isMobileEditorOpen ? 'block' : 'hidden lg:block'} lg:col-span-7 space-y-3 scroll-mt-20`}
+        >
           {/* Card Hub Single-Level Workspace Header */}
           <div className="flex items-center justify-between gap-2 px-1 pb-1">
             <div>
@@ -1610,16 +1706,26 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                 <span>Card Hub Sections</span>
               </h2>
               <p className="text-[11px] text-slate-400">
-                Tap any section below to expand or collapse. No nested sub-menus.
+                Tap any section below to expand or collapse. Changes update your card live above.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleToggleAllAccordions}
-              className="px-2.5 py-1 rounded-lg border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-[11px] font-semibold text-slate-300 hover:text-white transition shrink-0"
-            >
-              {areAllAccordionsOpen ? 'Collapse All' : 'Expand All'}
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleToggleAllAccordions}
+                className="px-2.5 py-1 rounded-lg border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-[11px] font-semibold text-slate-300 hover:text-white transition"
+              >
+                {areAllAccordionsOpen ? 'Collapse All' : 'Expand All'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsMobileEditorOpen(false)}
+                className="lg:hidden px-2.5 py-1 rounded-lg border border-indigo-500/40 bg-indigo-500/15 hover:bg-indigo-500/25 text-[11px] font-semibold text-indigo-300 transition flex items-center gap-1"
+              >
+                <X className="h-3 w-3" />
+                <span>Hide Menus</span>
+              </button>
+            </div>
           </div>
 
           {/* ================================================================= */}
@@ -5010,123 +5116,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
 
         </div>
       </div>
-
-      {/* MOBILE FULL-SCREEN LIVE CARD PREVIEW SHEET (< lg) */}
-      {isMobilePreviewModalOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden bg-slate-950/95 backdrop-blur-xl flex flex-col animate-in fade-in duration-200">
-          {/* Sheet Header */}
-          <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-800 bg-slate-900/90 shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div
-                className="h-3 w-3 rounded-full shrink-0"
-                style={{ backgroundColor: activeCard.accentColor || '#6366f1' }}
-              />
-              <div className="min-w-0">
-                <h3 className="text-xs sm:text-sm font-bold text-white truncate">
-                  {activeCard.name} — Live Card Preview
-                </h3>
-                <p className="text-[10px] text-slate-400 truncate">
-                  Switch between 3D Card, Story Deck, and Pass below
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsQrNfcPanelOpen((prev) => !prev)}
-                className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition ${
-                  isQrNfcPanelOpen
-                    ? 'border-indigo-400 bg-indigo-600 text-white'
-                    : 'border-slate-700 bg-slate-800 text-indigo-300'
-                }`}
-              >
-                <QrCode className="h-3.5 w-3.5" />
-                <span>QR & NFC</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsMobilePreviewModalOpen(false)}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white flex items-center gap-1 transition"
-              >
-                <X className="h-4 w-4" />
-                <span>Done</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Scrollable Live Card Stage & Optional QR/NFC Drawer */}
-          <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3.5 shadow-2xl">
-              <DigitalCardRenderer
-                profile={profile}
-                card={activeCard}
-                onUpdateCard={onUpdateCard}
-                onAddContactToCRM={onAddContactToCRM}
-                interactive={true}
-              />
-            </div>
-
-            {isQrNfcPanelOpen && (
-              <div className="rounded-2xl border border-indigo-500/40 bg-slate-900/95 p-4 space-y-4 shadow-2xl">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <QrCode className="h-4 w-4 text-indigo-400" />
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                      Instant QR & NFC Share
-                    </h4>
-                  </div>
-                  <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-md border border-slate-800 text-[10px]">
-                    <button
-                      type="button"
-                      onClick={() => setQrMode('vcard')}
-                      className={`px-2 py-0.5 rounded transition ${
-                        qrMode === 'vcard' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400'
-                      }`}
-                    >
-                      Offline vCard
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQrMode('weblink')}
-                      className={`px-2 py-0.5 rounded transition ${
-                        qrMode === 'weblink' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400'
-                      }`}
-                    >
-                      Web Link
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-center gap-3 bg-slate-950/90 p-4 rounded-xl border border-slate-800">
-                  {qrDataUrl && (
-                    <div className="bg-white p-2 rounded-lg shadow-md">
-                      <img src={qrDataUrl} alt="QR Code" className="h-36 w-36" />
-                    </div>
-                  )}
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleDownloadQR}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 text-xs font-medium"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Save QR</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                      <span>{copiedLink ? 'Copied Link!' : 'Copy Card Link'}</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* AI Bio Generator Modal */}
       <AIBioModal

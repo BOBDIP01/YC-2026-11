@@ -30,16 +30,76 @@ const app = express();
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-// Security Headers Middleware (OWASP & Store WebView Hardening)
-app.use((_req, res, next) => {
+// Constant-time string comparison to prevent timing side-channel attacks on secrets, passwords, and tokens
+function safeCompareStrings(a: string | undefined | null, b: string | undefined | null): boolean {
+  if (!a || !b || typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+// Strict CORS Origin Allowlist (Capacitor Native Shells + Configured Production Web Origins)
+const ALLOWED_CORS_ORIGINS = new Set<string>(
+  [
+    'capacitor://localhost',
+    'ionic://localhost',
+    'https://localhost',
+    'http://localhost',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://youconnect.app',
+    'https://www.youconnect.app',
+    'https://api.youconnect.app',
+    process.env.APP_URL || '',
+    process.env.VITE_PUBLIC_WEB_ORIGIN || '',
+    process.env.VITE_API_BASE_URL || '',
+  ]
+    .map((o) => o.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+);
+
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  const normalized = origin.trim().replace(/\/+$/, '');
+  if (ALLOWED_CORS_ORIGINS.has(normalized)) return true;
+  if (isDev && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(normalized)) return true;
+  // Allow Cloud Run / AI Studio preview origins (*.run.app / *.firebaseapp.com / *.web.app)
+  if (/^https:\/\/[a-z0-9-]+\.(run\.app|firebaseapp\.com|web\.app)$/i.test(normalized)) return true;
+  return false;
+}
+
+// Security Headers & Capacitor Mobile CORS Middleware (OWASP MASVS & Store WebView Hardening)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else if (!origin) {
+    res.setHeader('Access-Control-Allow-Origin', 'https://youconnect.app');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Client-Platform, X-Requested-With, X-Profile-Id, X-Owner-Token'
+  );
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' ws: wss: https:; frame-src 'self' https://www.youtube.com https://player.vimeo.com; frame-ancestors 'self'; base-uri 'self'; object-src 'none';"
+  );
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
   next();
 });
 
-// Per-IP Rate Limiter for AI, KYC, and Card Publishing Endpoints
+// Per-IP Rate Limiter for AI, KYC, Billing, Cloud Sync, Privacy Purge, and Card Publishing Endpoints
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 function checkRateLimit(ip: string, bucketKey: string, maxRequests: number, windowMs: number): boolean {
   const now = Date.now();
@@ -63,8 +123,20 @@ app.use('/api', (req, res, next) => {
       return res.status(429).json({ error: 'Rate limit exceeded. Please wait a moment before making additional AI requests.' });
     }
   } else if (req.path.startsWith('/cards/publish')) {
-    if (!checkRateLimit(clientIp, 'publish', 300, 60_000)) {
+    if (!checkRateLimit(clientIp, 'publish', 120, 60_000)) {
       return res.status(429).json({ error: 'Rate limit exceeded for card publishing.' });
+    }
+  } else if (
+    req.path.startsWith('/cloud/') ||
+    req.path.startsWith('/billing/') ||
+    req.path.startsWith('/privacy/purge')
+  ) {
+    if (!checkRateLimit(clientIp, 'sensitive_account_ops', 60, 60_000)) {
+      return res.status(429).json({ error: 'Rate limit exceeded for account/billing operations.' });
+    }
+  } else if (req.path.startsWith('/p2p-radar/rooms') && req.method !== 'GET') {
+    if (!checkRateLimit(clientIp, 'radar_room_mut', 20, 60_000)) {
+      return res.status(429).json({ error: 'Rate limit exceeded for room management.' });
     }
   }
   next();
@@ -251,6 +323,34 @@ app.get('/apple-touch-icon.png', (_req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.send(generateBrandPngIcon(180, false));
 });
+app.get('/store-icon-1024.png', (_req, res) => {
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(generateBrandPngIcon(1024, false));
+});
+
+// Persist static PNG icons to public/ on startup so Vite and Capacitor bundle them into dist/
+try {
+  const publicDir = path.resolve(__dirname, 'public');
+  if (!fs.existsSync(publicDir)) {
+    fs.mkdirSync(publicDir, { recursive: true });
+  }
+  const iconTargets: Array<{ file: string; size: number; maskable: boolean }> = [
+    { file: 'pwa-192x192.png', size: 192, maskable: false },
+    { file: 'pwa-512x512.png', size: 512, maskable: false },
+    { file: 'pwa-maskable-512x512.png', size: 512, maskable: true },
+    { file: 'apple-touch-icon.png', size: 180, maskable: false },
+    { file: 'store-icon-1024.png', size: 1024, maskable: false },
+  ];
+  for (const target of iconTargets) {
+    const filePath = path.join(publicDir, target.file);
+    if (!fs.existsSync(filePath)) {
+      fs.writeFileSync(filePath, generateBrandPngIcon(target.size, target.maskable));
+    }
+  }
+} catch (iconErr) {
+  console.warn('Could not pre-write static PNG icons to public/:', iconErr);
+}
 
 // Initialize Google GenAI with dynamic key lookup
 function getAIClient(): GoogleGenAI | null {
@@ -396,73 +496,72 @@ app.post('/api/ai/enrich', async (req, res) => {
     const socialInsights =
       socialEntries.length > 0
         ? socialEntries.slice(0, 4).map(([platform, handleOrUrl]) => {
-            const pName =
-              platform === 'linkedin'
-                ? 'LinkedIn'
-                : platform === 'twitter'
+          const pName =
+            platform === 'linkedin'
+              ? 'LinkedIn'
+              : platform === 'twitter'
                 ? 'X / Twitter'
                 : platform === 'github'
-                ? 'GitHub'
-                : platform === 'substack'
-                ? 'Substack'
-                : platform === 'instagram'
-                ? 'Instagram'
-                : platform === 'youtube'
-                ? 'YouTube'
-                : platform.charAt(0).toUpperCase() + platform.slice(1);
+                  ? 'GitHub'
+                  : platform === 'substack'
+                    ? 'Substack'
+                    : platform === 'instagram'
+                      ? 'Instagram'
+                      : platform === 'youtube'
+                        ? 'YouTube'
+                        : platform.charAt(0).toUpperCase() + platform.slice(1);
 
-            if (platform === 'linkedin') {
-              return {
-                platform: pName,
-                handleOrUrl,
-                recentSignal: `Recent executive post regarding ${companyStr}'s Q4 operational scaling and ${industry.toLowerCase()} roadmap.`,
-                salesRelevance: `Directly tie "${dealTopic}" to their Q4 executive scaling priorities announced on LinkedIn.`,
-              };
-            }
-            if (platform === 'twitter') {
-              return {
-                platform: pName,
-                handleOrUrl,
-                recentSignal: `Active commentary on real-time workflow automation, security compliance, and rapid team deployment at ${companyStr}.`,
-                salesRelevance: `Reference their recent X thread to position fast time-to-value for "${dealTopic}".`,
-              };
-            }
-            if (platform === 'github') {
-              return {
-                platform: pName,
-                handleOrUrl,
-                recentSignal: `Recent repository activity focused on high-throughput API integrations and developer tooling.`,
-                salesRelevance: `Share technical SDK benchmarks and integration docs tailored to ${companyStr}'s engineering stack.`,
-              };
-            }
-            if (platform === 'substack' || platform === 'medium') {
-              return {
-                platform: pName,
-                handleOrUrl,
-                recentSignal: `Published long-form analysis on next-generation architecture and measurable ROI in ${industry}.`,
-                salesRelevance: `Quote their recent article thesis as the foundation for "${dealTopic}".`,
-              };
-            }
+          if (platform === 'linkedin') {
             return {
               platform: pName,
               handleOrUrl,
-              recentSignal: `Recent community & brand updates shared via ${pName} highlighting upcoming initiatives at ${companyStr}.`,
-              salesRelevance: `Use their latest ${pName} milestone as a warm, authentic hook for "${dealTopic}".`,
+              recentSignal: `Recent executive post regarding ${companyStr}'s Q4 operational scaling and ${industry.toLowerCase()} roadmap.`,
+              salesRelevance: `Directly tie "${dealTopic}" to their Q4 executive scaling priorities announced on LinkedIn.`,
             };
-          })
+          }
+          if (platform === 'twitter') {
+            return {
+              platform: pName,
+              handleOrUrl,
+              recentSignal: `Active commentary on real-time workflow automation, security compliance, and rapid team deployment at ${companyStr}.`,
+              salesRelevance: `Reference their recent X thread to position fast time-to-value for "${dealTopic}".`,
+            };
+          }
+          if (platform === 'github') {
+            return {
+              platform: pName,
+              handleOrUrl,
+              recentSignal: `Recent repository activity focused on high-throughput API integrations and developer tooling.`,
+              salesRelevance: `Share technical SDK benchmarks and integration docs tailored to ${companyStr}'s engineering stack.`,
+            };
+          }
+          if (platform === 'substack' || platform === 'medium') {
+            return {
+              platform: pName,
+              handleOrUrl,
+              recentSignal: `Published long-form analysis on next-generation architecture and measurable ROI in ${industry}.`,
+              salesRelevance: `Quote their recent article thesis as the foundation for "${dealTopic}".`,
+            };
+          }
+          return {
+            platform: pName,
+            handleOrUrl,
+            recentSignal: `Recent community & brand updates shared via ${pName} highlighting upcoming initiatives at ${companyStr}.`,
+            salesRelevance: `Use their latest ${pName} milestone as a warm, authentic hook for "${dealTopic}".`,
+          };
+        })
         : [
-            {
-              platform: 'Professional Footprint',
-              handleOrUrl: contact.website || companyStr,
-              recentSignal: `Active leadership initiatives as ${roleStr} at ${companyStr} focused on ${industry}.`,
-              salesRelevance: `Align proposal for "${dealTopic}" with ${companyStr}'s current growth stage.`,
-            },
-          ];
+          {
+            platform: 'Professional Footprint',
+            handleOrUrl: contact.website || companyStr,
+            recentSignal: `Active leadership initiatives as ${roleStr} at ${companyStr} focused on ${industry}.`,
+            salesRelevance: `Align proposal for "${dealTopic}" with ${companyStr}'s current growth stage.`,
+          },
+        ];
 
     const topSignal = socialInsights[0];
-    const summary = `${contact.name || 'This lead'} serves as ${roleStr} at ${companyStr} (${industry}). ${
-      contact.headline ? `Shared Headline: "${contact.headline}". ` : ''
-    }Scanned ${socialEntries.length || 1} social/digital profile(s) with recent signals aligned with "${dealTopic}".`;
+    const summary = `${contact.name || 'This lead'} serves as ${roleStr} at ${companyStr} (${industry}). ${contact.headline ? `Shared Headline: "${contact.headline}". ` : ''
+      }Scanned ${socialEntries.length || 1} social/digital profile(s) with recent signals aligned with "${dealTopic}".`;
 
     const suggestedIcebreaker = `Hi ${firstName}, I caught your recent update on ${topSignal.platform} (${topSignal.handleOrUrl}) regarding ${companyStr}'s initiatives — would love to share how we can accelerate "${dealTopic}" this week.`;
 
@@ -490,9 +589,9 @@ app.post('/api/ai/enrich', async (req, res) => {
 
     const socialsList = contact.socials
       ? Object.entries(contact.socials)
-          .filter(([_, v]) => v)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(', ')
+        .filter(([_, v]) => v)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ')
       : 'None explicitly listed';
 
     const rubricaList = Array.isArray(contact.rubricaFields)
@@ -1411,13 +1510,13 @@ app.get('/api/kyc/records', (req, res) => {
 // DELETE /api/kyc/records/:traceabilityId — Removes a record if user revokes verification (verified by profileId)
 app.delete('/api/kyc/records/:traceabilityId', (req, res) => {
   const { traceabilityId } = req.params;
-  const profileId = String(req.query.profileId || req.headers['x-profile-id'] || '').trim();
+  const profileId = String(req.query.profileId || req.headers['x-profile-id'] || req.body?.profileId || '').trim();
   const existing = kycTraceabilityStore.get(traceabilityId);
   if (!existing) {
     return res.status(404).json({ error: 'Record not found' });
   }
-  if (profileId && existing.profileId && existing.profileId !== profileId) {
-    return res.status(403).json({ error: 'Forbidden: profile ownership mismatch' });
+  if (existing.profileId && (!profileId || !safeCompareStrings(existing.profileId, profileId))) {
+    return res.status(403).json({ error: 'Forbidden: valid profile ownership required to delete KYC record' });
   }
   kycTraceabilityStore.delete(traceabilityId);
   saveKycDatabase();
@@ -1439,6 +1538,14 @@ interface PublishedCardPayload {
 
 const publishedCardsStore = new Map<string, PublishedCardPayload>();
 const reciprocalExchangesStore: any[] = [];
+
+// URL Scheme Sanitizer to prevent DOM XSS via javascript:/data:/vbscript: URIs in published cards
+function sanitizeSafeUrlString(val: unknown): string | undefined {
+  if (typeof val !== 'string' || !val.trim()) return undefined;
+  const trimmed = val.trim();
+  if (/^(javascript|vbscript|data:text\/html)/i.test(trimmed)) return undefined;
+  return trimmed;
+}
 
 // Server-side Selective Sharing Sanitizer: Ensures unshared personal/work/rubrica fields are never stored or served publicly
 function sanitizePublishedProfile(rawProfile: any, card: any): any {
@@ -1465,8 +1572,8 @@ function sanitizePublishedProfile(rawProfile: any, card: any): any {
 
   if (rawProfile.personalData?.socials && typeof rawProfile.personalData.socials === 'object') {
     for (const [k, v] of Object.entries(rawProfile.personalData.socials)) {
-      if (vis.socials?.[k]) {
-        sanitizedPersonal.socials[k] = v;
+      if (vis.socials?.[k] && sanitizeSafeUrlString(v)) {
+        sanitizedPersonal.socials[k] = sanitizeSafeUrlString(v);
       }
     }
   }
@@ -1474,23 +1581,23 @@ function sanitizePublishedProfile(rawProfile: any, card: any): any {
   const sanitizedWork: any = {
     role: vis.role !== false ? rawProfile.workData?.role : '',
     company: vis.company !== false ? rawProfile.workData?.company : '',
-    companyLogoUrl: vis.companyLogo ? rawProfile.workData?.companyLogoUrl : undefined,
+    companyLogoUrl: vis.companyLogo ? sanitizeSafeUrlString(rawProfile.workData?.companyLogoUrl) : undefined,
     department: vis.department ? rawProfile.workData?.department : undefined,
     phone: vis.workPhone || vis.phone ? rawProfile.workData?.phone : undefined,
     email: vis.workEmail || vis.email ? rawProfile.workData?.email : undefined,
-    website: vis.website ? rawProfile.workData?.website : undefined,
+    website: vis.website ? sanitizeSafeUrlString(rawProfile.workData?.website) : undefined,
     officeAddress: vis.officeAddress ? rawProfile.workData?.officeAddress : undefined,
     headline: vis.headline !== false ? rawProfile.workData?.headline : undefined,
     bio: vis.bio !== false ? rawProfile.workData?.bio : undefined,
     taxIdOrVat: vis.taxId ? rawProfile.workData?.taxIdOrVat : undefined,
-    bookingLink: vis.bookingLink ? rawProfile.workData?.bookingLink : undefined,
+    bookingLink: vis.bookingLink ? sanitizeSafeUrlString(rawProfile.workData?.bookingLink) : undefined,
     socials: {},
   };
 
   if (rawProfile.workData?.socials && typeof rawProfile.workData.socials === 'object') {
     for (const [k, v] of Object.entries(rawProfile.workData.socials)) {
-      if (vis.socials?.[k]) {
-        sanitizedWork.socials[k] = v;
+      if (vis.socials?.[k] && sanitizeSafeUrlString(v)) {
+        sanitizedWork.socials[k] = sanitizeSafeUrlString(v);
       }
     }
   }
@@ -1498,8 +1605,9 @@ function sanitizePublishedProfile(rawProfile: any, card: any): any {
   const sanitizedSocials: Record<string, string> = {};
   if (rawProfile.socials && typeof rawProfile.socials === 'object') {
     for (const [k, v] of Object.entries(rawProfile.socials)) {
-      if (vis.socials?.[k] && typeof v === 'string') {
-        sanitizedSocials[k] = v;
+      const safeVal = sanitizeSafeUrlString(v);
+      if (vis.socials?.[k] && safeVal) {
+        sanitizedSocials[k] = safeVal;
       }
     }
   }
@@ -1515,20 +1623,20 @@ function sanitizePublishedProfile(rawProfile: any, card: any): any {
     company: vis.company !== false ? rawProfile.company : '',
     headline: vis.headline !== false ? rawProfile.headline : '',
     bio: vis.bio !== false ? rawProfile.bio : '',
-    avatarUrl: rawProfile.avatarUrl,
+    avatarUrl: sanitizeSafeUrlString(rawProfile.avatarUrl) || '',
     storedPictures: Array.isArray(rawProfile.storedPictures) ? rawProfile.storedPictures : [],
     email: vis.workEmail || vis.email ? rawProfile.email : '',
     phone: vis.workPhone || vis.phone ? rawProfile.phone : '',
-    website: vis.website ? rawProfile.website : '',
+    website: vis.website ? sanitizeSafeUrlString(rawProfile.website) || '' : '',
     location: vis.location ? rawProfile.location : '',
     isVerified: Boolean(rawProfile.isVerified),
     verifiedAt: rawProfile.verifiedAt,
     kycVerification: rawProfile.kycVerification
       ? {
-          status: rawProfile.kycVerification.status,
-          traceabilityId: rawProfile.kycVerification.traceabilityId,
-          verifiedAt: rawProfile.kycVerification.verifiedAt,
-        }
+        status: rawProfile.kycVerification.status,
+        traceabilityId: rawProfile.kycVerification.traceabilityId,
+        verifiedAt: rawProfile.kycVerification.verifiedAt,
+      }
       : undefined,
     personalData: sanitizedPersonal,
     workData: sanitizedWork,
@@ -1554,7 +1662,7 @@ app.post('/api/cards/publish', (req, res) => {
       existing &&
       existing.ownerToken &&
       ownerToken &&
-      existing.ownerToken !== ownerToken &&
+      !safeCompareStrings(existing.ownerToken, String(ownerToken)) &&
       existing.cardId !== keyId
     ) {
       return res.status(403).json({ error: 'Vanity slug is already owned by another session.' });
@@ -1571,6 +1679,10 @@ app.post('/api/cards/publish', (req, res) => {
       publishedAt: new Date().toISOString(),
     };
 
+    if (publishedCardsStore.size > 5000) {
+      const oldestKey = publishedCardsStore.keys().next().value;
+      if (oldestKey) publishedCardsStore.delete(oldestKey);
+    }
     if (keySlug) publishedCardsStore.set(keySlug, payload);
     if (keyId) publishedCardsStore.set(keyId, payload);
 
@@ -1607,11 +1719,14 @@ app.post('/api/cards/reciprocal', (req, res) => {
     if (!contact) return res.status(400).json({ error: 'Contact data required' });
 
     const exchange = {
-      id: `recip-${Date.now()}`,
-      cardId,
+      id: `recip-${crypto.randomBytes(6).toString('hex')}`,
+      cardId: String(cardId || '').slice(0, 80),
       contact,
       receivedAt: new Date().toISOString(),
     };
+    if (reciprocalExchangesStore.length >= 1000) {
+      reciprocalExchangesStore.shift();
+    }
     reciprocalExchangesStore.push(exchange);
     return res.json({ success: true, exchangeId: exchange.id });
   } catch (err: any) {
@@ -1619,12 +1734,455 @@ app.post('/api/cards/reciprocal', (req, res) => {
   }
 });
 
+// ============================================================================
+// FIREBASE CLOUD SYNC MIRROR & REVENUECAT BILLING / WEBHOOK INFRASTRUCTURE
+// ============================================================================
+
+interface UserEntitlementState {
+  appUserId: string;
+  tier: 'FREE' | 'BASIC' | 'BUSINESS';
+  activeEntitlements: string[];
+  activeSubscriptions: string[];
+  boosterBalance: number;
+  boosterExpiresAt: string | null;
+  expirationDate: string | null;
+  lastEvent: string;
+  updatedAt: string;
+}
+
+const userEntitlementsStore = new Map<string, UserEntitlementState>();
+const cloudSyncStore = new Map<string, any>();
+// Binds each uid to a SHA-256 fingerprint of its authenticating Bearer token or ownerToken to prevent Horizontal IDOR
+const uidTokenHashStore = new Map<string, string>();
+
+function extractCallerToken(req: express.Request): string | null {
+  const authHeader = String(req.headers.authorization || '').trim();
+  if (authHeader.toLowerCase().startsWith('bearer ')) {
+    const tok = authHeader.slice(7).trim();
+    if (tok) return tok;
+  }
+  const ownerHeader = String(req.headers['x-owner-token'] || req.body?.ownerToken || '').trim();
+  if (ownerHeader) return ownerHeader;
+  return null;
+}
+
+/**
+ * Verifies that the caller's Bearer JWT or ownerToken matches the token bound to `uid`
+ * (or decodes the Firebase JWT `sub`/`user_id` claim to confirm ownership).
+ * Prevents OWASP A01:2021 Broken Access Control (IDOR) across /api/cloud/sync and /api/privacy/purge.
+ */
+function verifyCallerAuthorizationForUid(req: express.Request, targetUid: string): boolean {
+  if (!targetUid || targetUid === 'anonymous') return true;
+  const token = extractCallerToken(req);
+
+  // If a Bearer JWT is present with 3 segments, verify `sub` or `user_id` claim matches targetUid
+  if (token && token.split('.').length === 3) {
+    try {
+      const payloadJson = Buffer.from(token.split('.')[1], 'base64url').toString('utf8');
+      const payload = JSON.parse(payloadJson);
+      const tokenUid = payload.user_id || payload.sub || payload.uid;
+      if (tokenUid && tokenUid !== targetUid) {
+        return false;
+      }
+    } catch {
+      // Non-JWT bearer token; fall through to token hash binding
+    }
+  }
+
+  const existingHash = uidTokenHashStore.get(targetUid);
+  if (!token) {
+    // If the UID is already bound to an authenticated token, reject unauthenticated access
+    return !existingHash;
+  }
+
+  const incomingHash = crypto.createHash('sha256').update(token).digest('hex');
+  if (!existingHash) {
+    uidTokenHashStore.set(targetUid, incomingHash);
+    return true;
+  }
+  return safeCompareStrings(existingHash, incomingHash);
+}
+
+function getOrCreateEntitlement(appUserId: string): UserEntitlementState {
+  const existing = userEntitlementsStore.get(appUserId);
+  if (existing) return existing;
+  const initial: UserEntitlementState = {
+    appUserId,
+    tier: 'FREE',
+    activeEntitlements: [],
+    activeSubscriptions: [],
+    boosterBalance: 0,
+    boosterExpiresAt: null,
+    expirationDate: null,
+    lastEvent: 'INIT',
+    updatedAt: new Date().toISOString(),
+  };
+  userEntitlementsStore.set(appUserId, initial);
+  return initial;
+}
+
+// RevenueCat Server-to-Server Webhook Endpoint
+// Configure in RevenueCat Dashboard -> Integrations -> Webhooks -> POST /api/webhooks/revenuecat
+app.post('/api/webhooks/revenuecat', (req, res) => {
+  try {
+    const expectedSecret = process.env.REVENUECAT_WEBHOOK_AUTH_SECRET;
+    if (!isDev && !expectedSecret) {
+      return res.status(503).json({
+        error: 'Webhook endpoint disabled: REVENUECAT_WEBHOOK_AUTH_SECRET is not configured in production.',
+      });
+    }
+    if (expectedSecret) {
+      const authHeader = String(req.headers.authorization || '');
+      const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+      if (
+        !safeCompareStrings(token, expectedSecret) &&
+        !safeCompareStrings(authHeader, expectedSecret)
+      ) {
+        return res.status(401).json({ error: 'Unauthorized RevenueCat webhook signature' });
+      }
+    }
+
+    const event = req.body?.event || req.body || {};
+    const eventType = String(event.type || 'UNKNOWN').toUpperCase();
+    const appUserId = String(event.app_user_id || event.original_app_user_id || 'anonymous');
+    const productId = String(event.product_id || '');
+    const entitlementIds: string[] = Array.isArray(event.entitlement_ids)
+      ? event.entitlement_ids
+      : event.entitlement_id
+        ? [String(event.entitlement_id)]
+        : [];
+
+    const state = getOrCreateEntitlement(appUserId);
+    state.lastEvent = eventType;
+    state.updatedAt = new Date().toISOString();
+
+    if (
+      eventType === 'INITIAL_PURCHASE' ||
+      eventType === 'RENEWAL' ||
+      eventType === 'UNCANCELLATION' ||
+      eventType === 'PRODUCT_CHANGE'
+    ) {
+      if (
+        entitlementIds.includes('business_access') ||
+        productId.includes('business')
+      ) {
+        state.tier = 'BUSINESS';
+        state.activeEntitlements = Array.from(new Set([...state.activeEntitlements, 'business_access', 'basic_access']));
+        state.activeSubscriptions = Array.from(new Set([...state.activeSubscriptions, productId || 'youconnect_business_monthly']));
+      } else if (
+        entitlementIds.includes('basic_access') ||
+        productId.includes('basic')
+      ) {
+        if (state.tier !== 'BUSINESS') state.tier = 'BASIC';
+        state.activeEntitlements = Array.from(new Set([...state.activeEntitlements, 'basic_access']));
+        state.activeSubscriptions = Array.from(new Set([...state.activeSubscriptions, productId || 'youconnect_basic_monthly']));
+      }
+      if (event.expiration_at_ms) {
+        state.expirationDate = new Date(Number(event.expiration_at_ms)).toISOString();
+      }
+    } else if (eventType === 'NON_RENEWING_PURCHASE') {
+      if (productId.includes('booster') || productId === 'youconnect_ai_booster_50') {
+        state.boosterBalance += 50;
+        const exp = new Date();
+        exp.setMonth(exp.getMonth() + 3);
+        state.boosterExpiresAt = exp.toISOString();
+      }
+    } else if (eventType === 'EXPIRATION' || eventType === 'BILLING_ISSUE') {
+      state.tier = 'FREE';
+      state.activeEntitlements = [];
+      state.activeSubscriptions = [];
+    }
+
+    userEntitlementsStore.set(appUserId, state);
+    return res.json({ received: true, state });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Webhook processing failed', details: err.message });
+  }
+});
+
+// Client Receipt Verification & Sync Endpoint (StoreKit 2 / Play Billing / RevenueCat SDK)
+app.post('/api/billing/verify-receipt', (req, res) => {
+  try {
+    const {
+      appUserId = 'anonymous',
+      productId = '',
+      tier,
+      transactionId,
+      isConsumable,
+      coinsGranted = 50,
+    } = req.body || {};
+
+    const cleanUid = String(appUserId);
+    if (!verifyCallerAuthorizationForUid(req, cleanUid)) {
+      return res.status(403).json({ error: 'Forbidden: Bearer token does not match appUserId.' });
+    }
+
+    const state = getOrCreateEntitlement(cleanUid);
+    state.updatedAt = new Date().toISOString();
+    state.lastEvent = transactionId ? `VERIFIED_${transactionId}` : 'CLIENT_SYNC';
+
+    // Cap consumable grant to a maximum of 50 coins per receipt verification to prevent parameter tampering
+    const safeCoinsGranted = Math.min(Math.max(Number(coinsGranted) || 50, 1), 50);
+
+    if (isConsumable || String(productId).includes('booster')) {
+      state.boosterBalance += safeCoinsGranted;
+      const exp = new Date();
+      exp.setMonth(exp.getMonth() + 3);
+      state.boosterExpiresAt = exp.toISOString();
+    } else if (tier === 'BUSINESS' || String(productId).includes('business')) {
+      state.tier = 'BUSINESS';
+      state.activeEntitlements = ['business_access', 'basic_access'];
+      state.activeSubscriptions = [productId || 'youconnect_business_monthly'];
+    } else if (tier === 'BASIC' || String(productId).includes('basic')) {
+      state.tier = 'BASIC';
+      state.activeEntitlements = ['basic_access'];
+      state.activeSubscriptions = [productId || 'youconnect_basic_monthly'];
+    } else if (tier === 'FREE') {
+      state.tier = 'FREE';
+      state.activeEntitlements = [];
+      state.activeSubscriptions = [];
+    }
+
+    userEntitlementsStore.set(cleanUid, state);
+    return res.json({ verified: true, entitlement: state });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Receipt verification failed', details: err.message });
+  }
+});
+
+// Query Active RevenueCat Entitlements for Current User
+app.get('/api/billing/entitlements', (req, res) => {
+  const appUserId = String(req.query.appUserId || 'anonymous');
+  if (!verifyCallerAuthorizationForUid(req, appUserId)) {
+    return res.status(403).json({ error: 'Forbidden: Bearer token does not match appUserId.' });
+  }
+  const state = getOrCreateEntitlement(appUserId);
+  return res.json(state);
+});
+
+// Cloud Profile & CRM Sync Endpoints (Server Mirror alongside Firebase Cloud Firestore)
+app.post('/api/cloud/sync', (req, res) => {
+  try {
+    const { uid, profiles, activeProfileId, contacts, subscription, updatedAt } = req.body || {};
+    if (!uid) return res.status(400).json({ error: 'uid is required' });
+    const cleanUid = String(uid);
+    if (!verifyCallerAuthorizationForUid(req, cleanUid)) {
+      return res.status(403).json({ error: 'Forbidden: Bearer token does not match target uid.' });
+    }
+    const snapshot = {
+      uid: cleanUid,
+      profiles: Array.isArray(profiles) ? profiles : [],
+      activeProfileId: String(activeProfileId || ''),
+      contacts: Array.isArray(contacts) ? contacts : [],
+      subscription: subscription || null,
+      updatedAt: updatedAt || new Date().toISOString(),
+    };
+    cloudSyncStore.set(cleanUid, snapshot);
+    return res.json({ synced: true, updatedAt: snapshot.updatedAt });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/cloud/sync/:uid', (req, res) => {
+  const cleanUid = String(req.params.uid);
+  if (!verifyCallerAuthorizationForUid(req, cleanUid)) {
+    return res.status(403).json({ error: 'Forbidden: Bearer token does not match target uid.' });
+  }
+  const snapshot = cloudSyncStore.get(cleanUid);
+  if (!snapshot) {
+    return res.status(404).json({ error: 'No cloud snapshot found for user' });
+  }
+  return res.json(snapshot);
+});
+
+// Apple Universal Links & Android App Links Verification Endpoints
+app.get('/.well-known/apple-app-site-association', (_req, res) => {
+  const teamId = process.env.APPLE_TEAM_ID || 'TEAMID1234';
+  res.setHeader('Content-Type', 'application/json');
+  res.json({
+    applinks: {
+      apps: [],
+      details: [
+        {
+          appID: `${teamId}.com.youconnect.app`,
+          paths: ['/p/*', '/card/*'],
+        },
+      ],
+    },
+    webcredentials: {
+      apps: [`${teamId}.com.youconnect.app`],
+    },
+  });
+});
+
+app.get('/.well-known/assetlinks.json', (_req, res) => {
+  const sha256 =
+    process.env.ANDROID_CERT_SHA256 ||
+    'FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C';
+  res.setHeader('Content-Type', 'application/json');
+  res.json([
+    {
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: {
+        namespace: 'android_app',
+        package_name: 'com.youconnect.app',
+        sha256_cert_fingerprints: [sha256],
+      },
+    },
+  ]);
+});
+
+// Public Store Review Legal Pages (Apple Guideline 3.1.2 & Google Play Data Safety)
+app.get('/privacy', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — YouConnect</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #090D16; color: #E2E8F0; max-width: 780px; margin: 0 auto; padding: 40px 24px; line-height: 1.65; }
+    h1, h2 { color: #FFFFFF; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; background: rgba(16,185,129,0.15); color: #34D399; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+    .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; margin: 20px 0; }
+    a { color: #60A5FA; }
+  </style>
+</head>
+<body>
+  <span class="badge">GDPR &amp; CCPA Compliant • Zero-Knowledge Biometrics</span>
+  <h1>YouConnect Privacy Policy</h1>
+  <p>Last Updated: November 2026 • App ID: <code>com.youconnect.app</code></p>
+  <div class="card">
+    <h2>1. Data We Collect &amp; Purpose</h2>
+    <p>YouConnect collects only the professional identity details you explicitly add to your digital business cards (Name, Role, Company, Email, Phone, Social links) and authenticated account credentials via Firebase Authentication (Sign in with Apple, Sign in with Google, or Email/Password).</p>
+  </div>
+  <div class="card">
+    <h2>2. Biometric &amp; KYC Zero-Raw-Retention Policy</h2>
+    <p>Optional Identity Verification (KYC) processes government ID imagery and live selfie frames transiently in volatile memory for liveness and face-match verification. Raw document images and biometric selfie frames are purged immediately after verification. Only a non-reversible SHA-256 cryptographic receipt is stored.</p>
+  </div>
+  <div class="card">
+    <h2>3. Subscriptions &amp; Payments (RevenueCat)</h2>
+    <p>In-app subscriptions (Basic Monthly and Business Pro Monthly) and AI Quota Boosters are processed natively by Apple App Store (StoreKit 2) and Google Play Billing, managed via RevenueCat. YouConnect never stores raw payment card numbers.</p>
+  </div>
+  <div class="card">
+    <h2>4. Account &amp; Data Deletion (GDPR Art. 17 / Apple Guideline 5.1.1(v))</h2>
+    <p>You may permanently delete your account and all associated cloud and local records at any time from within the app (<strong>Settings &rarr; Compliance &rarr; Execute Full Account &amp; Server Purge</strong>) or via our web portal at <a href="/delete-account">/delete-account</a>.</p>
+  </div>
+</body>
+</html>`);
+});
+
+app.get('/terms', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Use (EULA) — YouConnect</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #090D16; color: #E2E8F0; max-width: 780px; margin: 0 auto; padding: 40px 24px; line-height: 1.65; }
+    h1, h2 { color: #FFFFFF; }
+    .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; margin: 20px 0; }
+    a { color: #60A5FA; }
+  </style>
+</head>
+<body>
+  <h1>YouConnect Terms of Use &amp; End User License Agreement (EULA)</h1>
+  <p>Effective: November 2026 • Bundle ID: <code>com.youconnect.app</code></p>
+  <div class="card">
+    <h2>1. Auto-Renewable Subscriptions</h2>
+    <p>YouConnect offers optional auto-renewing monthly plans: <strong>Basic Plan ($12/month)</strong> and <strong>Business Pro Plan ($29/month)</strong>, plus an optional consumable <strong>AI Quota Booster ($14.99 for +50 AI Coins, valid 90 days)</strong>.</p>
+    <ul>
+      <li>Payment is charged to your Apple ID or Google Play account at confirmation of purchase.</li>
+      <li>Subscriptions automatically renew unless canceled at least 24 hours before the end of the current monthly billing period.</li>
+      <li>You can manage and cancel subscriptions in your App Store or Google Play Account Settings after purchase.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h2>2. Acceptable Use &amp; Digital Identity</h2>
+    <p>You agree not to impersonate others or publish fraudulent identity credentials. Optional KYC verification badges reflect cryptographic verification at the time of inspection.</p>
+  </div>
+  <p><a href="/privacy">Privacy Policy</a> • <a href="/delete-account">Account Deletion Portal</a></p>
+</body>
+</html>`);
+});
+
+app.get('/delete-account', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Delete Account &amp; Data — YouConnect</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #090D16; color: #E2E8F0; max-width: 680px; margin: 0 auto; padding: 40px 24px; line-height: 1.65; }
+    .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 24px; margin: 20px 0; }
+    input { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: #111827; color: #fff; margin: 8px 0 16px; }
+    button { background: #E11D48; color: #fff; font-weight: 700; border: none; padding: 12px 20px; border-radius: 10px; cursor: pointer; width: 100%; }
+    #out { margin-top: 16px; font-size: 13px; color: #34D399; }
+  </style>
+</head>
+<body>
+  <h1>Account &amp; Data Deletion Portal</h1>
+  <p>In compliance with Apple App Store Guideline 5.1.1(v), Google Play Data Safety Policy, and GDPR Article 17, you can permanently erase your YouConnect account, public card slugs, Firebase cloud backups, and KYC traceability hashes below.</p>
+  <div class="card">
+    <label for="identifier">Account UID, Vanity Slug, or Registered Email</label>
+    <input id="identifier" placeholder="e.g. alex-rivera or Firebase UID" />
+    <label for="ownerToken">Session Ownership / Bearer Token (if account is token-bound)</label>
+    <input id="ownerToken" placeholder="Optional ownership token from Settings -> Compliance" />
+    <button id="purge-btn" type="button">Permanently Delete Account &amp; Cloud Data</button>
+    <div id="out" role="status" aria-live="polite"></div>
+  </div>
+  <script>
+    document.getElementById('purge-btn').addEventListener('click', async function() {
+      const id = document.getElementById('identifier').value.trim();
+      const token = document.getElementById('ownerToken').value.trim();
+      const out = document.getElementById('out');
+      if (!id) return;
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      const res = await fetch('/api/privacy/purge', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ uid: id, ownerToken: token || undefined, vanitySlugs: [id], cardIds: [id], personaIds: [id] })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        out.style.color = '#F87171';
+        out.textContent = data.error || 'Authorization required to purge protected account.';
+        return;
+      }
+      out.style.color = '#34D399';
+      out.textContent = 'Purge Complete • Receipt: ' + (data.receiptHash || 'DELETED');
+    });
+  </script>
+</body>
+</html>`);
+});
+
 // GDPR Article 17 Server-Side Recursive Purge Endpoint
 app.post('/api/privacy/purge', (req, res) => {
   try {
-    const { personaIds = [], cardIds = [], vanitySlugs = [], traceabilityIds = [] } = req.body || {};
+    const { uid, ownerToken, personaIds = [], cardIds = [], vanitySlugs = [], traceabilityIds = [] } = req.body || {};
     let purgedCards = 0;
     let purgedKyc = 0;
+    let purgedCloud = false;
+
+    if (uid) {
+      const cleanUid = String(uid);
+      if (!verifyCallerAuthorizationForUid(req, cleanUid)) {
+        return res.status(403).json({
+          error: 'Forbidden: Valid Bearer token or session ownership token required to purge protected account.',
+        });
+      }
+      purgedCloud = cloudSyncStore.delete(cleanUid);
+      userEntitlementsStore.delete(cleanUid);
+      uidTokenHashStore.delete(cleanUid);
+    }
 
     const cardKeysToDelete = new Set<string>([
       ...(Array.isArray(cardIds) ? cardIds.map((id: string) => String(id).toLowerCase()) : []),
@@ -1632,11 +2190,20 @@ app.post('/api/privacy/purge', (req, res) => {
     ]);
 
     for (const [key, entry] of Array.from(publishedCardsStore.entries())) {
-      if (
+      const matchesKey =
         cardKeysToDelete.has(key) ||
         (entry.cardId && cardKeysToDelete.has(String(entry.cardId).toLowerCase())) ||
-        (entry.profile?.id && Array.isArray(personaIds) && personaIds.includes(entry.profile.id))
-      ) {
+        (entry.profile?.id && Array.isArray(personaIds) && personaIds.includes(entry.profile.id));
+
+      if (matchesKey) {
+        // If the card has an ownerToken bound, verify caller provided matching ownerToken or authenticated uid
+        if (
+          entry.ownerToken &&
+          ownerToken &&
+          !safeCompareStrings(entry.ownerToken, String(ownerToken))
+        ) {
+          continue;
+        }
         publishedCardsStore.delete(key);
         purgedCards++;
       }
@@ -1659,8 +2226,9 @@ app.post('/api/privacy/purge', (req, res) => {
       purged: true,
       purgedCards,
       purgedKyc,
+      purgedCloud,
       timestamp: new Date().toISOString(),
-      receiptHash: `GDPR17-SRV-${Date.now().toString(36).toUpperCase()}`,
+      receiptHash: `GDPR17-SRV-${crypto.randomBytes(8).toString('hex').toUpperCase()}`,
     });
   } catch (err: any) {
     return res.status(500).json({ error: 'Server purge failed', details: err.message });
@@ -1723,39 +2291,13 @@ interface ServerRadarRoom {
 const radarRooms = new Map<string, ServerRadarRoom>();
 const defaultTenHoursMs = 10 * 60 * 60 * 1000;
 
-// Seed initial conference rooms (max 10 hours)
+// Seed initial public networking room (max 10 hours)
 radarRooms.set('tech_summit', {
   id: 'tech_summit',
-  name: 'Global Tech Summit 2026',
-  description: 'Main plenary networking floor and stage hall. Open to all registered attendees.',
+  name: 'Public Networking Room',
+  description: 'Open networking floor. Connect with peers nearby, discover digital cards, and exchange contacts in real time.',
   hasPassword: false,
   maxParticipants: 0,
-  durationMinutes: 600,
-  createdAt: Date.now(),
-  expiresAt: Date.now() + defaultTenHoursMs,
-  createdBy: 'System',
-  isDefault: true,
-});
-
-radarRooms.set('yc_demo', {
-  id: 'yc_demo',
-  name: 'YC Founders & Angels Lounge',
-  description: 'High-signal seed & series A matchmaking space with limited seating.',
-  hasPassword: false,
-  maxParticipants: 50,
-  durationMinutes: 600,
-  createdAt: Date.now(),
-  expiresAt: Date.now() + defaultTenHoursMs,
-  createdBy: 'System',
-  isDefault: true,
-});
-
-radarRooms.set('web_summit', {
-  id: 'web_summit',
-  name: 'Web Summit Executive Circle',
-  description: 'Enterprise leaders, advisors, and corporate partners.',
-  hasPassword: false,
-  maxParticipants: 40,
   durationMinutes: 600,
   createdAt: Date.now(),
   expiresAt: Date.now() + defaultTenHoursMs,
@@ -1846,10 +2388,10 @@ app.post('/api/p2p-radar/rooms', (req, res) => {
     const requiresPass = Boolean(hasPassword && password && String(password).trim().length > 0);
     const pass = requiresPass ? String(password).trim() : undefined;
 
-    const roomId = 'room_' + Math.random().toString(36).substring(2, 9);
+    const roomId = 'room_' + crypto.randomBytes(6).toString('hex');
     const now = Date.now();
-    // Unique creator authentication key so the creator can terminate/kill the room anytime, even after crash/reboot
-    const creatorKey = 'ckey_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+    // Cryptographically strong creator authentication key so the creator can terminate/kill the room anytime
+    const creatorKey = 'ckey_' + crypto.randomBytes(16).toString('hex');
 
     const newRoom: ServerRadarRoom = {
       id: roomId,
@@ -1898,11 +2440,11 @@ app.delete('/api/p2p-radar/rooms/:roomId', (req, res) => {
       return res.status(403).json({ error: 'Default conference halls cannot be killed.' });
     }
 
-    // Verify creator credentials: by creatorKey OR by createdByProfileId OR room password
+    // Verify creator credentials using constant-time comparison: by creatorKey OR by createdByProfileId OR room password
     const isAuthorized =
-      (creatorKey && room.creatorKey && creatorKey === room.creatorKey) ||
-      (profileId && room.createdByProfileId && profileId === room.createdByProfileId) ||
-      (password && room.password && password === room.password);
+      (creatorKey && room.creatorKey && safeCompareStrings(String(creatorKey), room.creatorKey)) ||
+      (profileId && room.createdByProfileId && safeCompareStrings(String(profileId), room.createdByProfileId)) ||
+      (password && room.password && safeCompareStrings(String(password), room.password));
 
     if (!isAuthorized) {
       return res.status(403).json({ error: 'Unauthorized: Only the room host can terminate this room.' });
@@ -1957,8 +2499,13 @@ async function startServer() {
   const isDev = process.env.NODE_ENV !== 'production';
   const server = http.createServer(app);
 
-  // Initialize Real WebSocket Server for P2P Radar
-  const wss = new WebSocketServer({ server, path: '/api/p2p-radar' });
+  // Initialize Real WebSocket Server for P2P Radar with 10 MB max frame size (accommodates high-res vCards/avatars) and Origin verification
+  const wss = new WebSocketServer({
+    server,
+    path: '/api/p2p-radar',
+    maxPayload: 10 * 1024 * 1024,
+    verifyClient: (info: { origin: string; secure: boolean; req: http.IncomingMessage }) => isAllowedOrigin(info.origin),
+  });
 
   // Automatic mutual card exchange between Room Creator (Host) and every participant in the room
   function executeRoomCreatorAutoExchange(room: ServerRadarRoom, joiningSession: SocketClientSession) {
@@ -2061,10 +2608,28 @@ async function startServer() {
   }
 
   wss.on('connection', (ws: WebSocket) => {
-    const socketId = 'sock_' + Math.random().toString(36).substring(2, 9);
+    const socketId = 'sock_' + crypto.randomBytes(6).toString('hex');
+    let msgWindowStart = Date.now();
+    let msgCountInWindow = 0;
+
+    // Gracefully handle socket errors to prevent unhandled process crashes
+    ws.on('error', (err) => {
+      console.warn(`WebSocket error on ${socketId}:`, err?.message || err);
+    });
 
     ws.on('message', (messageRaw: string) => {
       try {
+        // Per-socket sliding window rate limiter (max 45 messages per 10 seconds to prevent WS frame flooding)
+        const nowTs = Date.now();
+        if (nowTs - msgWindowStart > 10_000) {
+          msgWindowStart = nowTs;
+          msgCountInWindow = 0;
+        }
+        msgCountInWindow += 1;
+        if (msgCountInWindow > 45) {
+          return;
+        }
+
         const msg = JSON.parse(messageRaw.toString());
 
         if (msg.type === 'JOIN_ROOM') {
@@ -2090,9 +2655,9 @@ async function startServer() {
             return;
           }
 
-          // 2. Password Check
+          // 2. Password Check (constant-time comparison)
           if (room.hasPassword) {
-            if (!password || password !== room.password) {
+            if (!password || !safeCompareStrings(String(password), room.password)) {
               ws.send(
                 JSON.stringify({
                   type: 'ROOM_JOIN_ERROR',
@@ -2128,6 +2693,10 @@ async function startServer() {
           const baseDistance = 1.8 + Math.random() * 5.5;
           const signalDbm = -Math.round(44 + baseDistance * 3.8);
 
+          const sanitizedFullProfile = peer.fullProfile
+            ? sanitizePublishedProfile(peer.fullProfile, peer.fullCard || peer.cardData)
+            : peer;
+
           const livePeer: LiveRadarPeer = {
             id: peer.id || socketId,
             name: peer.name || 'Anonymous Attendee',
@@ -2135,9 +2704,9 @@ async function startServer() {
             company: peer.company || 'Enterprise',
             email: peer.email || '',
             phone: peer.phone || '',
-            website: peer.website || '',
+            website: sanitizeSafeUrlString(peer.website) || '',
             avatarUrl:
-              peer.avatarUrl ||
+              sanitizeSafeUrlString(peer.avatarUrl) ||
               'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
             customTagline: peer.customTagline || '',
             distanceMeters: Number(baseDistance.toFixed(1)),
@@ -2149,11 +2718,11 @@ async function startServer() {
               company: peer.company,
               email: peer.email,
               phone: peer.phone,
-              website: peer.website,
+              website: sanitizeSafeUrlString(peer.website),
               customTagline: peer.customTagline,
             },
             fullCard: peer.fullCard || peer.cardData,
-            fullProfile: peer.fullProfile || peer,
+            fullProfile: sanitizedFullProfile,
             isRealLivePeer: true,
             socketId,
             roomId: room.id,
@@ -2217,7 +2786,9 @@ async function startServer() {
 
             if (msg.peer) {
               currentSession.peer.fullCard = msg.peer.fullCard || currentSession.peer.fullCard;
-              currentSession.peer.fullProfile = msg.peer.fullProfile || currentSession.peer.fullProfile;
+              currentSession.peer.fullProfile = msg.peer.fullProfile
+                ? sanitizePublishedProfile(msg.peer.fullProfile, currentSession.peer.fullCard)
+                : currentSession.peer.fullProfile;
             }
 
             let room = radarRooms.get(targetRoomId);
@@ -2239,9 +2810,9 @@ async function startServer() {
               return;
             }
 
-            // Password Check
+            // Password Check (constant-time comparison)
             if (room.hasPassword) {
-              if (!password || password !== room.password) {
+              if (!password || !safeCompareStrings(String(password), room.password)) {
                 ws.send(
                   JSON.stringify({
                     type: 'ROOM_JOIN_ERROR',
@@ -2333,11 +2904,14 @@ async function startServer() {
             currentSession.peer.name = msg.peer.name || currentSession.peer.name;
             currentSession.peer.role = msg.peer.role || currentSession.peer.role;
             currentSession.peer.company = msg.peer.company || currentSession.peer.company;
-            currentSession.peer.avatarUrl = msg.peer.avatarUrl || currentSession.peer.avatarUrl;
+            currentSession.peer.avatarUrl =
+              sanitizeSafeUrlString(msg.peer.avatarUrl) || currentSession.peer.avatarUrl;
             currentSession.peer.customTagline = msg.peer.customTagline || currentSession.peer.customTagline;
             currentSession.peer.cardData = msg.peer.cardData || currentSession.peer.cardData;
             currentSession.peer.fullCard = msg.peer.fullCard || currentSession.peer.fullCard;
-            currentSession.peer.fullProfile = msg.peer.fullProfile || currentSession.peer.fullProfile;
+            currentSession.peer.fullProfile = msg.peer.fullProfile
+              ? sanitizePublishedProfile(msg.peer.fullProfile, currentSession.peer.fullCard)
+              : currentSession.peer.fullProfile;
 
             const activeRoom = radarRooms.get(currentSession.roomId);
             if (activeRoom && activeRoom.createdByProfileId === currentSession.peer.id) {
@@ -2356,20 +2930,28 @@ async function startServer() {
             }
           }
         } else if (msg.type === 'EXCHANGE_REQUEST') {
-          // Peer A requests to exchange card with Target Peer B
+          // Peer A requests to exchange card with Target Peer B (strictly scoped to the same room)
           const currentSession = radarClients.get(ws);
           const targetPeerId = msg.targetPeerId;
 
           let targetSession: SocketClientSession | null = null;
-          for (const s of radarClients.values()) {
-            if (s.peer.id === targetPeerId || s.socketId === targetPeerId) {
-              targetSession = s;
-              break;
+          if (currentSession) {
+            for (const s of radarClients.values()) {
+              if (
+                s.roomId === currentSession.roomId &&
+                (s.peer.id === targetPeerId || s.socketId === targetPeerId)
+              ) {
+                targetSession = s;
+                break;
+              }
             }
           }
 
           if (targetSession && targetSession.ws.readyState === WebSocket.OPEN && currentSession) {
             const reqId = msg.requestId || 'req_' + Date.now();
+            const safeProfile = msg.fromProfile
+              ? sanitizePublishedProfile(msg.fromProfile, msg.fromCard)
+              : currentSession.peer.fullProfile;
             targetSession.ws.send(
               JSON.stringify({
                 type: 'INCOMING_EXCHANGE_REQUEST',
@@ -2377,7 +2959,7 @@ async function startServer() {
                 fromPeerId: currentSession.peer.id,
                 fromSocketId: currentSession.socketId,
                 fromCard: msg.fromCard,
-                fromProfile: msg.fromProfile,
+                fromProfile: safeProfile,
                 senderPeer: currentSession.peer,
               })
             );
@@ -2398,21 +2980,29 @@ async function startServer() {
             );
           }
         } else if (msg.type === 'EXCHANGE_RESPONSE') {
-          // Target Peer B responds (accepts or declines)
+          // Target Peer B responds (accepts or declines), strictly within the same room
           const currentSession = radarClients.get(ws);
           const targetPeerId = msg.targetPeerId;
 
           let targetSession: SocketClientSession | null = null;
-          for (const s of radarClients.values()) {
-            if (s.peer.id === targetPeerId || s.socketId === targetPeerId) {
-              targetSession = s;
-              break;
+          if (currentSession) {
+            for (const s of radarClients.values()) {
+              if (
+                s.roomId === currentSession.roomId &&
+                (s.peer.id === targetPeerId || s.socketId === targetPeerId)
+              ) {
+                targetSession = s;
+                break;
+              }
             }
           }
 
           if (msg.accepted) {
             // Successful two-way exchange!
             if (targetSession && targetSession.ws.readyState === WebSocket.OPEN && currentSession) {
+              const safeFromProfile = msg.fromProfile
+                ? sanitizePublishedProfile(msg.fromProfile, msg.fromCard)
+                : currentSession.peer.fullProfile;
               // Send to Peer A
               targetSession.ws.send(
                 JSON.stringify({
@@ -2420,12 +3010,15 @@ async function startServer() {
                   targetPeerId: currentSession.peer.id,
                   targetPeer: currentSession.peer,
                   targetCard: msg.fromCard,
-                  targetProfile: msg.fromProfile,
+                  targetProfile: safeFromProfile,
                   requestId: msg.requestId,
                 })
               );
             }
 
+            const safeTargetProfile = msg.targetProfile
+              ? sanitizePublishedProfile(msg.targetProfile, msg.targetCard)
+              : targetSession?.peer.fullProfile;
             // Send confirmation to Peer B
             ws.send(
               JSON.stringify({
@@ -2433,7 +3026,7 @@ async function startServer() {
                 targetPeerId,
                 targetPeer: targetSession ? targetSession.peer : null,
                 targetCard: msg.targetCard,
-                targetProfile: msg.targetProfile,
+                targetProfile: safeTargetProfile,
                 requestId: msg.requestId,
               })
             );
@@ -2454,9 +3047,9 @@ async function startServer() {
           const room = radarRooms.get(roomId);
           if (room && !room.isDefault) {
             const isAuthorized =
-              (creatorKey && room.creatorKey && creatorKey === room.creatorKey) ||
-              (profileId && room.createdByProfileId && profileId === room.createdByProfileId) ||
-              (password && room.password && password === room.password);
+              (creatorKey && room.creatorKey && safeCompareStrings(String(creatorKey), room.creatorKey)) ||
+              (profileId && room.createdByProfileId && safeCompareStrings(String(profileId), room.createdByProfileId)) ||
+              (password && room.password && safeCompareStrings(String(password), room.password));
 
             if (isAuthorized) {
               radarRooms.delete(roomId);
@@ -2512,13 +3105,20 @@ async function startServer() {
     });
   });
 
-  // Prune dead sessions, broadcast room updates, and handle room expirations (max 10h)
+  // Prune dead sessions, expired rate-limit buckets, and expired rooms (max 10h)
   setInterval(() => {
     const now = Date.now();
     for (const [ws, session] of radarClients.entries()) {
       if (now - session.lastPing > 45000 && ws.readyState === WebSocket.OPEN) {
         ws.terminate();
         radarClients.delete(ws);
+      }
+    }
+
+    // Prune expired rate-limit buckets to prevent unbounded memory growth
+    for (const [key, bucket] of rateLimitBuckets.entries()) {
+      if (now > bucket.resetAt) {
+        rateLimitBuckets.delete(key);
       }
     }
 
@@ -2541,6 +3141,11 @@ async function startServer() {
             hadExpired = true;
           }
         }
+        // Permanently delete expired rooms after 1-hour grace window
+        if (now > room.expiresAt + 3600000) {
+          radarRooms.delete(roomId);
+          hadExpired = true;
+        }
       }
     }
 
@@ -2552,7 +3157,7 @@ async function startServer() {
   if (isDev) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
+      server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);

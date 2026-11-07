@@ -17,6 +17,7 @@ import {
 import { findDuplicatePairs } from '../utils/deduplication';
 import { exportContactsToCSV } from '../utils/vcard';
 import { getQuotaSummary } from '../utils/subscription';
+import { apiFetch } from '../utils/apiConfig';
 import { DuplicateMergeModal } from './DuplicateMergeModal';
 import { ContactCardReaderModal } from './ContactCardReaderModal';
 import { COVER_BANNER_PRESETS } from '../data/presets';
@@ -626,7 +627,7 @@ export const CRMView: React.FC<CRMViewProps> = ({
       `${contact.company} Enterprise Partnership`;
 
     try {
-      const res = await fetch('/api/ai/enrich', {
+      const res = await apiFetch('/api/ai/enrich', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1044,7 +1045,7 @@ export const CRMView: React.FC<CRMViewProps> = ({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+    <div className="mx-auto w-full max-w-[1720px] px-3 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-6">
       {/* Top Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -1277,8 +1278,8 @@ export const CRMView: React.FC<CRMViewProps> = ({
             selectedContact ? 'lg:col-span-6' : 'lg:col-span-12'
           } rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl`}
         >
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900/40">
+            <table className="w-full min-w-[760px] text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950/70 text-slate-400 font-semibold">
                   <th className="py-3 px-4">Account & Primary Contact</th>

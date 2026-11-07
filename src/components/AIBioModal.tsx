@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MasterProfile, SubscriptionState, AiUsageType } from '../types';
 import { getQuotaSummary } from '../utils/subscription';
+import { apiFetch } from '../utils/apiConfig';
 import { Sparkles, X, Check, Loader2, Wand2, Coins } from 'lucide-react';
 
 interface AIBioModalProps {
@@ -46,7 +47,7 @@ export const AIBioModal: React.FC<AIBioModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/ai/bio', {
+      const res = await apiFetch('/api/ai/bio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

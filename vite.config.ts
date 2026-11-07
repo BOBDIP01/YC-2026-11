@@ -14,9 +14,7 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio cloud preview environment
-      hmr: false,
-      watch: null,
+      hmr: true,
     },
     build: {
       chunkSizeWarningLimit: 2500,

@@ -26,6 +26,20 @@ import { ShareModal } from './components/ShareModal';
 import { CreatePersonaModal } from './components/CreatePersonaModal';
 import { PublicCardView } from './components/PublicCardView';
 import { SubscriptionModal } from './components/SubscriptionModal';
+import { apiFetch } from './utils/apiConfig';
+import {
+  AuthenticatedUser,
+  subscribeToAuthChanges,
+  registerWithFirebaseEmail,
+  signInWithFirebaseEmail,
+  signInWithAppleFirebase,
+  signInWithGoogleFirebase,
+  signOutFirebase,
+  syncUserSnapshotToFirestore,
+  deleteFirebaseAccountAndCloudData,
+  isFirebaseConfigured,
+} from './services/firebase';
+import { initializeRevenueCat } from './services/revenuecat';
 
 const LEGACY_STORAGE_KEYS = [
   'youconnect_personas',
@@ -323,6 +337,9 @@ export default function App() {
   const [authTabMode, setAuthTabMode] = useState<'signon' | 'signin'>('signon');
   const [signInEmailInput, setSignInEmailInput] = useState('');
   const [signInPhoneInput, setSignInPhoneInput] = useState('');
+  const [authPasswordInput, setAuthPasswordInput] = useState('');
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthenticatedUser | null>(null);
   const [enableKydBinding, setEnableKydBinding] = useState(true);
 
   const [betaForm, setBetaForm] = useState({
@@ -332,6 +349,14 @@ export default function App() {
     personalPhone: '',
   });
   const [betaFormError, setBetaFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthChanges((user) => {
+      setAuthUser(user);
+      initializeRevenueCat(user?.uid).catch(() => {});
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Navigation State (supports ?tab=radar, ?tab=rubrica, ?tab=crm, ?tab=settings from links)
   const [activeTab, setActiveTab] = useState<AppNavTab>(() => {
@@ -623,7 +648,7 @@ export default function App() {
 
     async function loadRemoteCard() {
       try {
-        const res = await fetch(`/api/cards/${encodeURIComponent(publicCardSlug!)}`);
+        const res = await apiFetch(`/api/cards/${encodeURIComponent(publicCardSlug!)}`);
         if (res.ok) {
           const data = await res.json();
           if (!isCancelled && data.card && data.profile) {
@@ -669,6 +694,20 @@ export default function App() {
   useEffect(() => {
     safeSetLocalStorage('youconnect_subscription_v1', JSON.stringify(subscription));
   }, [subscription]);
+
+  // Debounced Cloud Firestore Synchronization when user is authenticated
+  useEffect(() => {
+    if (!authUser?.uid) return;
+    const timer = setTimeout(() => {
+      syncUserSnapshotToFirestore({
+        personas,
+        cards,
+        contacts,
+        subscription,
+      }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [authUser?.uid, personas, cards, contacts, subscription]);
 
   // Subscription & AI Quota Coin Handlers
   const handleConsumeAiCoin = (usageType: AiUsageType, label: string): boolean => {
@@ -898,7 +937,7 @@ export default function App() {
     setActiveCardId(newCard.id);
   };
 
-  // Full Recursive Purge (GDPR Right to Erasure — Local + Server Registry & KYC Purge)
+  // Full Recursive Purge (GDPR Right to Erasure & Apple Guideline 5.1.1(v) — Local + Firebase Cloud + Server Registry & KYC Purge)
   const handleRecursivePurge = () => {
     const personaIds = personas.map((p) => p.id);
     const cardIds = cards.map((c) => c.id);
@@ -907,15 +946,11 @@ export default function App() {
       .map((p) => p.kycVerification?.traceabilityId)
       .filter(Boolean) as string[];
 
-    fetch('/api/privacy/purge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        personaIds,
-        cardIds,
-        vanitySlugs,
-        traceabilityIds,
-      }),
+    deleteFirebaseAccountAndCloudData({
+      personaIds,
+      cardIds,
+      vanitySlugs,
+      traceabilityIds,
     }).catch(() => {
       // Non-blocking if offline
     });
@@ -1188,18 +1223,23 @@ export default function App() {
         currentCardCount={cards.length}
       />
 
-      {/* Sign-In & Sign-On (Registration) Initial Page integrated with KYD & Identity Settings */}
+      {/* Sign-In & Sign-On (Registration) Initial Page integrated with Firebase Auth, Sign in with Apple (Guideline 4.8) & KYD */}
       {isBetaScratchOnboardingOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg rounded-2xl border border-indigo-500/40 bg-slate-900 p-6 shadow-2xl text-slate-100 space-y-5 max-h-[92vh] overflow-y-auto">
+          <div className="relative w-full max-w-lg rounded-2xl border border-indigo-500/40 bg-slate-900 p-6 shadow-2xl text-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
               <div>
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-indigo-500/20 border border-indigo-500/40 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-indigo-300 mb-1.5">
-                  KYD & IDENTITY VERIFICATION · SIGN IN / SIGN ON
-                </span>
+                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-indigo-500/20 border border-indigo-500/40 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-indigo-300">
+                    FIREBASE AUTH & KYD · SIGN IN / SIGN ON
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono text-emerald-300">
+                    {isFirebaseConfigured() ? 'Firebase Live Project' : 'Firebase SDK Ready'}
+                  </span>
+                </div>
                 <h2 className="text-lg font-bold text-white">YouConnect Identity Portal</h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Sign On (register as a new user) or Sign In. Only your 4 registration fields (Name, Last Name, Email, Phone Number) are pre-filled in your Master Profile — all other fields and images start completely blank.
+                  Sign On (register as a new user) or Sign In with Apple, Google, or Email. Only your 4 registration fields (Name, Last Name, Email, Phone Number) are pre-filled in your Master Profile — all other fields and images start completely blank.
                 </p>
               </div>
               <button
@@ -1208,6 +1248,109 @@ export default function App() {
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition text-xs font-bold"
               >
                 ✕
+              </button>
+            </div>
+
+            {authUser && (
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3.5 py-2.5 text-xs">
+                <div className="min-w-0">
+                  <div className="font-bold text-emerald-300 truncate">
+                    Authenticated: {authUser.displayName || authUser.email}
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400 truncate">
+                    UID: {authUser.uid} · Provider: {authUser.providerId}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await signOutFirebase();
+                  }}
+                  className="shrink-0 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-300 hover:text-white transition"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
+
+            {/* Apple Guideline 4.8 Mandatory "Sign in with Apple" & Google OAuth Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+              <button
+                type="button"
+                disabled={isAuthSubmitting}
+                onClick={async () => {
+                  setBetaFormError(null);
+                  setIsAuthSubmitting(true);
+                  try {
+                    const fbUser = await signInWithAppleFirebase();
+                    const fName = fbUser.firstName || 'Apple';
+                    const lName = fbUser.lastName || 'User';
+                    const cleanPersona = createScratchStarterPersona({
+                      firstName: fName,
+                      lastName: lName,
+                      email: fbUser.email,
+                      phone: fbUser.phoneNumber || '',
+                    });
+                    const cleanCard = createScratchStarterCard({
+                      firstName: fName,
+                      lastName: lName,
+                      email: fbUser.email,
+                      phone: fbUser.phoneNumber || '',
+                    });
+                    setPersonas([cleanPersona]);
+                    setActivePersonaId(cleanPersona.id);
+                    setCards([cleanCard]);
+                    setActiveCardId(cleanCard.id);
+                    setIsBetaScratchOnboardingOpen(false);
+                  } catch (err: any) {
+                    setBetaFormError(err?.message || 'Sign in with Apple failed.');
+                  } finally {
+                    setIsAuthSubmitting(false);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl bg-white text-slate-950 hover:bg-slate-100 py-2.5 px-3 font-bold shadow transition disabled:opacity-50"
+              >
+                <span></span>
+                <span>Sign in with Apple</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isAuthSubmitting}
+                onClick={async () => {
+                  setBetaFormError(null);
+                  setIsAuthSubmitting(true);
+                  try {
+                    const fbUser = await signInWithGoogleFirebase();
+                    const fName = fbUser.firstName || 'Google';
+                    const lName = fbUser.lastName || 'User';
+                    const cleanPersona = createScratchStarterPersona({
+                      firstName: fName,
+                      lastName: lName,
+                      email: fbUser.email,
+                      phone: fbUser.phoneNumber || '',
+                    });
+                    const cleanCard = createScratchStarterCard({
+                      firstName: fName,
+                      lastName: lName,
+                      email: fbUser.email,
+                      phone: fbUser.phoneNumber || '',
+                    });
+                    setPersonas([cleanPersona]);
+                    setActivePersonaId(cleanPersona.id);
+                    setCards([cleanCard]);
+                    setActiveCardId(cleanCard.id);
+                    setIsBetaScratchOnboardingOpen(false);
+                  } catch (err: any) {
+                    setBetaFormError(err?.message || 'Google Sign-In failed.');
+                  } finally {
+                    setIsAuthSubmitting(false);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 text-white hover:bg-slate-800 py-2.5 px-3 font-bold transition disabled:opacity-50"
+              >
+                <span className="font-serif font-extrabold text-cyan-400">G</span>
+                <span>Continue with Google</span>
               </button>
             </div>
 
@@ -1304,6 +1447,18 @@ export default function App() {
                       className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
+                  <div className="sm:col-span-2">
+                    <label className="block font-semibold text-slate-300 mb-1">
+                      Account Password (Optional for KYD · 6+ chars for Firebase Cloud Auth)
+                    </label>
+                    <input
+                      type="password"
+                      value={authPasswordInput}
+                      onChange={(e) => setAuthPasswordInput(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
 
                 {/* KYD & Identity Settings Binding Option */}
@@ -1337,7 +1492,8 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    disabled={isAuthSubmitting}
+                    onClick={async () => {
                       const fName = betaForm.firstName.trim();
                       const lName = betaForm.lastName.trim();
                       const pEmail = betaForm.personalEmail.trim();
@@ -1348,51 +1504,66 @@ export default function App() {
                         );
                         return;
                       }
-                      const fullName = `${fName} ${lName}`.trim();
-
-                      safeSetLocalStorage(
-                        'youconnect_registered_account_v1',
-                        JSON.stringify({
+                      setBetaFormError(null);
+                      setIsAuthSubmitting(true);
+                      try {
+                        const fbUser = await registerWithFirebaseEmail({
+                          email: pEmail,
+                          password: authPasswordInput || undefined,
                           firstName: fName,
                           lastName: lName,
-                          fullName,
+                          phone: pPhone,
+                        });
+                        const fullName = `${fName} ${lName}`.trim();
+
+                        safeSetLocalStorage(
+                          'youconnect_registered_account_v1',
+                          JSON.stringify({
+                            uid: fbUser.uid,
+                            firstName: fName,
+                            lastName: lName,
+                            fullName,
+                            email: pEmail,
+                            phone: pPhone,
+                            kydBound: enableKydBinding,
+                            registeredAt: new Date().toISOString(),
+                          })
+                        );
+                        safeSetLocalStorage('youconnect_clean_reg_migrated_v3', 'true');
+                        safeSetLocalStorage('youconnect_clean_card_migrated_v3', 'true');
+
+                        const cleanPersona = createScratchStarterPersona({
+                          firstName: fName,
+                          lastName: lName,
                           email: pEmail,
                           phone: pPhone,
-                          kydBound: enableKydBinding,
-                          registeredAt: new Date().toISOString(),
-                        })
-                      );
-                      safeSetLocalStorage('youconnect_clean_reg_migrated_v3', 'true');
-                      safeSetLocalStorage('youconnect_clean_card_migrated_v3', 'true');
+                        });
+                        const cleanCard = createScratchStarterCard({
+                          firstName: fName,
+                          lastName: lName,
+                          email: pEmail,
+                          phone: pPhone,
+                        });
 
-                      // Replace personas and starter card with clean-slate registration profile (ONLY the 4 registration fields filled)
-                      const cleanPersona = createScratchStarterPersona({
-                        firstName: fName,
-                        lastName: lName,
-                        email: pEmail,
-                        phone: pPhone,
-                      });
-                      const cleanCard = createScratchStarterCard({
-                        firstName: fName,
-                        lastName: lName,
-                        email: pEmail,
-                        phone: pPhone,
-                      });
+                        setPersonas([cleanPersona]);
+                        setActivePersonaId(cleanPersona.id);
+                        setCards([cleanCard]);
+                        setActiveCardId(cleanCard.id);
+                        setContacts([]);
 
-                      setPersonas([cleanPersona]);
-                      setActivePersonaId(cleanPersona.id);
-                      setCards([cleanCard]);
-                      setActiveCardId(cleanCard.id);
-                      setContacts([]);
-
-                      setIsBetaScratchOnboardingOpen(false);
-                      if (typeof window !== 'undefined') {
-                        window.history.replaceState(null, '', window.location.pathname);
+                        setIsBetaScratchOnboardingOpen(false);
+                        if (typeof window !== 'undefined') {
+                          window.history.replaceState(null, '', window.location.pathname);
+                        }
+                      } catch (err: any) {
+                        setBetaFormError(err?.message || 'Registration failed.');
+                      } finally {
+                        setIsAuthSubmitting(false);
                       }
                     }}
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition shadow-lg shadow-indigo-600/30"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition shadow-lg shadow-indigo-600/30 disabled:opacity-50"
                   >
-                    Complete Sign On & Save Identity
+                    {isAuthSubmitting ? 'Creating Account...' : 'Complete Sign On & Save Identity'}
                   </button>
                 </div>
               </>
@@ -1423,6 +1594,18 @@ export default function App() {
                       className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1">
+                      Account Password (Optional for KYD)
+                    </label>
+                    <input
+                      type="password"
+                      value={authPasswordInput}
+                      onChange={(e) => setAuthPasswordInput(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-3 border-t border-slate-800 text-xs">
@@ -1435,56 +1618,70 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    disabled={isAuthSubmitting}
+                    onClick={async () => {
                       const em = signInEmailInput.trim();
                       const ph = signInPhoneInput.trim();
                       if (!em || !ph) {
                         setBetaFormError('Please enter your Email and Phone Number to Sign In.');
                         return;
                       }
-                      let savedAcc: any = null;
+                      setBetaFormError(null);
+                      setIsAuthSubmitting(true);
                       try {
-                        const raw = localStorage.getItem('youconnect_registered_account_v1');
-                        if (raw) savedAcc = JSON.parse(raw);
-                      } catch {
-                        // ignore
-                      }
-                      const fName =
-                        savedAcc?.firstName ||
-                        currentProfile.personalData?.firstName ||
-                        currentProfile.firstName ||
-                        currentProfile.name.split(' ')[0] ||
-                        'Verified';
-                      const lName =
-                        savedAcc?.lastName ||
-                        currentProfile.personalData?.lastName ||
-                        currentProfile.lastName ||
-                        currentProfile.name.split(' ').slice(1).join(' ') ||
-                        'User';
-                      const fullName = `${fName} ${lName}`.trim();
-
-                      setPersonas((prev) =>
-                        prev.map((p) => ({
-                          ...p,
-                          firstName: fName,
-                          lastName: lName,
+                        await signInWithFirebaseEmail({
                           email: em,
+                          password: authPasswordInput || undefined,
                           phone: ph,
-                          personalData: {
-                            ...(p.personalData || { phone: ph, email: em, socials: {} }),
+                        });
+                        let savedAcc: any = null;
+                        try {
+                          const raw = localStorage.getItem('youconnect_registered_account_v1');
+                          if (raw) savedAcc = JSON.parse(raw);
+                        } catch {
+                          // ignore
+                        }
+                        const fName =
+                          savedAcc?.firstName ||
+                          currentProfile.personalData?.firstName ||
+                          currentProfile.firstName ||
+                          currentProfile.name.split(' ')[0] ||
+                          'Verified';
+                        const lName =
+                          savedAcc?.lastName ||
+                          currentProfile.personalData?.lastName ||
+                          currentProfile.lastName ||
+                          currentProfile.name.split(' ').slice(1).join(' ') ||
+                          'User';
+                        const fullName = `${fName} ${lName}`.trim();
+
+                        setPersonas((prev) =>
+                          prev.map((p) => ({
+                            ...p,
                             firstName: fName,
                             lastName: lName,
-                            fullName,
                             email: em,
                             phone: ph,
-                          },
-                        }))
-                      );
-                      setIsBetaScratchOnboardingOpen(false);
+                            personalData: {
+                              ...(p.personalData || { phone: ph, email: em, socials: {} }),
+                              firstName: fName,
+                              lastName: lName,
+                              fullName,
+                              email: em,
+                              phone: ph,
+                            },
+                          }))
+                        );
+                        setIsBetaScratchOnboardingOpen(false);
+                      } catch (err: any) {
+                        setBetaFormError(err?.message || 'Sign-In failed.');
+                      } finally {
+                        setIsAuthSubmitting(false);
+                      }
                     }}
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition shadow-lg shadow-indigo-600/30"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition shadow-lg shadow-indigo-600/30 disabled:opacity-50"
                   >
-                    Sign In with KYD Verification
+                    {isAuthSubmitting ? 'Signing In...' : 'Sign In with KYD Verification'}
                   </button>
                 </div>
               </>

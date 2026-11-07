@@ -21,6 +21,7 @@ import {
   getFilledSocialAccounts,
   syncSocialAccountsToLegacyLinks,
 } from '../data/socialRegistry';
+import { apiFetch } from '../utils/apiConfig';
 import {
   CheckCircle2,
   User,
@@ -348,7 +349,7 @@ export const MasterProfileEditor: React.FC<MasterProfileEditorProps> = ({
     }
     setIsGeneratingLogo(true);
     try {
-      const res = await fetch('/api/ai/logo', {
+      const res = await apiFetch('/api/ai/logo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

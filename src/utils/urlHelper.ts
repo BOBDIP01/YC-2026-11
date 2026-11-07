@@ -1,27 +1,27 @@
 import { DigitalCard, MasterProfile } from '../types';
+import { apiFetch, getPublicWebOrigin, isNativeMobilePlatform } from './apiConfig';
 
 /**
  * Returns the fully qualified public URL for opening a digital business card on any smartphone or browser.
- * Uses window.location.origin to point to the real running instance.
+ * Uses getPublicWebOrigin() so Capacitor iOS/Android builds always encode a real HTTPS Universal Link
+ * rather than `capacitor://localhost` or `https://localhost`.
  */
 export function getCardPublicUrl(card: { vanitySlug?: string; id?: string }): string {
-  if (typeof window === 'undefined') {
-    return `https://youconnect.app/p/${card.vanitySlug || card.id || 'profile'}`;
-  }
-  const origin = window.location.origin;
+  const origin = getPublicWebOrigin();
   const slug = encodeURIComponent(card.vanitySlug || card.id || 'profile');
   return `${origin}/p/${slug}`;
 }
 
 /**
- * Returns a clean, human-readable URL display string (e.g. "ais-pre-.../p/elena-exec")
+ * Returns a clean, human-readable URL display string (e.g. "youconnect.app/p/elena-exec")
  */
 export function getCardDisplayUrl(card: { vanitySlug?: string; id?: string }): string {
-  if (typeof window === 'undefined') {
-    return `youconnect.app/p/${card.vanitySlug || card.id || 'profile'}`;
+  const slug = card.vanitySlug || card.id || 'profile';
+  if (typeof window === 'undefined' || isNativeMobilePlatform()) {
+    const origin = getPublicWebOrigin().replace(/^https?:\/\//i, '');
+    return `${origin}/p/${slug}`;
   }
   const host = window.location.host;
-  const slug = card.vanitySlug || card.id || 'profile';
   return `${host}/p/${slug}`;
 }
 
@@ -179,7 +179,7 @@ export async function publishCardToServer(card: DigitalCard, profile: MasterProf
         }
         inFlightSignatureByCard.set(card.id, payloadJson);
         try {
-          const res = await fetch('/api/cards/publish', {
+          const res = await apiFetch('/api/cards/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: payloadJson,

@@ -99,7 +99,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/95 backdrop-blur-xl pt-safe">
-        <div className="mx-auto flex h-13 sm:h-15 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8 gap-2">
+        <div className="mx-auto flex h-13 sm:h-15 w-full max-w-[1720px] items-center justify-between px-3 sm:px-6 lg:px-8 xl:px-10 gap-2">
           {/* Zone 1: Brand Wordmark */}
           <div className="flex items-center gap-2 shrink-0">
             <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 text-white shadow-md shadow-indigo-500/20">

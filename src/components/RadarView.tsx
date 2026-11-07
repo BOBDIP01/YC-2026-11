@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { MasterProfile, DigitalCard, PeerNode, CRMContact, ContactSource, CRMStatus, RadarRoomPublicInfo, SubscriptionState } from '../types';
 import { isWebNfcSupported, startNfcReader, NfcReadResult } from '../services/nfc';
 import { extractSelectiveContactData } from '../utils/selectiveSharing';
+import { apiFetch, getWebSocketUrl } from '../utils/apiConfig';
 import {
   Radio,
   Wifi,
@@ -40,7 +41,9 @@ import {
   Crown,
   Flame,
   ChevronDown,
+  HelpCircle,
 } from 'lucide-react';
+import { RadarWalkthroughModal } from './RadarWalkthroughModal';
 
 interface RadarViewProps {
   profile: MasterProfile;
@@ -54,89 +57,6 @@ interface RadarViewProps {
   onUpdateSubscription?: (updated: SubscriptionState) => void;
   onOpenSubscriptionModal?: (reason?: string) => void;
 }
-
-const SIMULATED_CONFERENCE_PEERS: PeerNode[] = [
-  {
-    id: 'sim-peer-1',
-    name: 'Dr. Liam Sterling',
-    role: 'Head of AI Infrastructure',
-    company: 'TensorScale Labs',
-    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-    distanceMeters: 3.2,
-    signalDbm: -56,
-    protocol: 'bluetooth',
-    cardData: {
-      name: 'Dr. Liam Sterling',
-      role: 'Head of AI Infrastructure',
-      company: 'TensorScale Labs',
-      email: 'liam@tensorscalelabs.com',
-      phone: '+1 (415) 778-9012',
-      website: 'https://tensorscalelabs.com',
-      customTagline: 'Scaling distributed GPU clusters across bare-metal datacenter racks',
-    },
-    isDemo: true,
-  },
-  {
-    id: 'sim-peer-2',
-    name: 'Amara Okafor',
-    role: 'Partner & Seed Investor',
-    company: 'Verdant Horizon Ventures',
-    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
-    distanceMeters: 5.8,
-    signalDbm: -68,
-    protocol: 'wifi',
-    cardData: {
-      name: 'Amara Okafor',
-      role: 'Partner & Seed Investor',
-      company: 'Verdant Horizon Ventures',
-      email: 'amara@verdantventures.vc',
-      phone: '+44 20 7946 0912',
-      website: 'https://verdantventures.vc',
-      customTagline: 'Backing climate-resilient enterprise supply chains and sovereign energy',
-    },
-    isDemo: true,
-  },
-  {
-    id: 'sim-peer-3',
-    name: 'Kenji Takahashi',
-    role: 'Chief Product Architect',
-    company: 'OmniFlow Spatial',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
-    distanceMeters: 8.4,
-    signalDbm: -74,
-    protocol: 'bluetooth',
-    cardData: {
-      name: 'Kenji Takahashi',
-      role: 'Chief Product Architect',
-      company: 'OmniFlow Spatial',
-      email: 'kenji@omniflow.io',
-      phone: '+81 3 5555 0143',
-      website: 'https://omniflow.io',
-      customTagline: 'Next-gen spatial interfaces for collaborative industrial CAD',
-    },
-    isDemo: true,
-  },
-  {
-    id: 'sim-peer-4',
-    name: 'Seraphina Vance',
-    role: 'VP of Ecosystem Growth',
-    company: 'ZeroKnowledge Guild',
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80',
-    distanceMeters: 14.1,
-    signalDbm: -82,
-    protocol: 'wifi',
-    cardData: {
-      name: 'Seraphina Vance',
-      role: 'VP of Ecosystem Growth',
-      company: 'ZeroKnowledge Guild',
-      email: 's.vance@zkguild.org',
-      phone: '+1 (650) 902-3341',
-      website: 'https://zkguild.org',
-      customTagline: 'Decentralized identity protocols and privacy-preserving zero-knowledge proofs',
-    },
-    isDemo: true,
-  },
-];
 
 interface IncomingExchangeRequest {
   requestId: string;
@@ -189,15 +109,25 @@ export const RadarView: React.FC<RadarViewProps> = ({
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [wsLatency, setWsLatency] = useState<number | null>(null);
   const [realLivePeers, setRealLivePeers] = useState<PeerNode[]>([]);
-  const [showDemoPeers, setShowDemoPeers] = useState(true);
+  // Interactive Walkthrough Guide (opens automatically on first visit, or manually via button)
+  const [isGuideOpen, setIsGuideOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return !localStorage.getItem('yc_radar_guide_completed');
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
   const [conferenceRoom, setConferenceRoom] = useState<string>('tech_summit');
 
   // Rooms Infrastructure
   const [roomsList, setRoomsList] = useState<RadarRoomPublicInfo[]>([
     {
       id: 'tech_summit',
-      name: 'Global Tech Summit 2026',
-      description: 'Main plenary networking floor and stage hall. Open to all registered attendees.',
+      name: 'Public Networking Room',
+      description: 'Open networking floor. Connect with peers nearby, discover digital cards, and exchange contacts in real time.',
       hasPassword: false,
       maxParticipants: 0,
       durationMinutes: 600,
@@ -205,34 +135,6 @@ export const RadarView: React.FC<RadarViewProps> = ({
       expiresAt: Date.now() + 10 * 3600 * 1000,
       createdBy: 'System',
       currentParticipantsCount: 1,
-      isExpired: false,
-      isDefault: true,
-    },
-    {
-      id: 'yc_demo',
-      name: 'YC Founders & Angels Lounge',
-      description: 'High-signal seed & series A matchmaking space with limited seating.',
-      hasPassword: false,
-      maxParticipants: 50,
-      durationMinutes: 600,
-      createdAt: Date.now(),
-      expiresAt: Date.now() + 10 * 3600 * 1000,
-      createdBy: 'System',
-      currentParticipantsCount: 0,
-      isExpired: false,
-      isDefault: true,
-    },
-    {
-      id: 'web_summit',
-      name: 'Web Summit Executive Circle',
-      description: 'Enterprise leaders, advisors, and corporate partners.',
-      hasPassword: false,
-      maxParticipants: 40,
-      durationMinutes: 600,
-      createdAt: Date.now(),
-      expiresAt: Date.now() + 10 * 3600 * 1000,
-      createdBy: 'System',
-      currentParticipantsCount: 0,
       isExpired: false,
       isDefault: true,
     },
@@ -398,7 +300,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
       }
     }
 
-    fetch('/api/p2p-radar/rooms')
+    apiFetch('/api/p2p-radar/rooms')
       .then((r) => r.json())
       .then((res) => {
         if (res?.rooms && Array.isArray(res.rooms)) {
@@ -433,11 +335,8 @@ export const RadarView: React.FC<RadarViewProps> = ({
     return () => clearInterval(timer);
   }, [currentRoomInfo]);
 
-  // Compute effective visible peers (combining real WebSocket live peers + optional demo attendees)
-  const allPeers: PeerNode[] = [
-    ...realLivePeers,
-    ...(showDemoPeers ? SIMULATED_CONFERENCE_PEERS : []),
-  ];
+  // Effective visible peers (real WebSocket live devices only)
+  const allPeers: PeerNode[] = realLivePeers;
 
   // =========================================================================
   // 1. REAL WEBSOCKET CONNECTION LIFECYCLE
@@ -450,8 +349,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
       if (!isMounted) return;
       setWsStatus('connecting');
 
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/p2p-radar`;
+      const wsUrl = getWebSocketUrl('/api/p2p-radar');
 
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
@@ -548,13 +446,13 @@ export const RadarView: React.FC<RadarViewProps> = ({
           } else if (data.type === 'ROOM_EXPIRED') {
             setRoomAlert(data.message);
             setConferenceRoom('tech_summit');
-            fetch('/api/p2p-radar/rooms')
+            apiFetch('/api/p2p-radar/rooms')
               .then((r) => r.json())
               .then((res) => res?.rooms && setRoomsList(res.rooms));
           } else if (data.type === 'ROOM_KILLED') {
             setRoomAlert(data.message);
             setConferenceRoom('tech_summit');
-            fetch('/api/p2p-radar/rooms')
+            apiFetch('/api/p2p-radar/rooms')
               .then((r) => r.json())
               .then((res) => res?.rooms && setRoomsList(res.rooms));
           } else if (data.type === 'PEER_JOINED') {
@@ -937,7 +835,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
       setIsKilling(true);
       const creatorKey = myCreatorKeys[roomToKill.id] || '';
 
-      const res = await fetch(`/api/p2p-radar/rooms/${roomToKill.id}`, {
+      const res = await apiFetch(`/api/p2p-radar/rooms/${roomToKill.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -981,7 +879,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
       }
 
       // Re-fetch rooms
-      fetch('/api/p2p-radar/rooms')
+      apiFetch('/api/p2p-radar/rooms')
         .then((r) => r.json())
         .then((resp) => resp?.rooms && setRoomsList(resp.rooms));
     } catch (err: any) {
@@ -1014,7 +912,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
         ? Math.min(5, createRoomForm.maxParticipants || 5)
         : createRoomForm.maxParticipants;
 
-      const res = await fetch('/api/p2p-radar/rooms', {
+      const res = await apiFetch('/api/p2p-radar/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1082,14 +980,14 @@ export const RadarView: React.FC<RadarViewProps> = ({
   };
 
   // =========================================================================
-  // 2. CARD EXCHANGE LOGIC (REAL WEBSOCKET & DEMO FALLBACK)
+  // 2. CARD EXCHANGE LOGIC (REAL WEBSOCKET TWO-WAY HANDSHAKE)
   // =========================================================================
 
   // Initiate Card Exchange
   const handleExchangeCard = (peer: PeerNode) => {
     setExchangeState('handshaking');
 
-    if (peer.isRealLivePeer && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       // Real WebSocket Two-Way Handshake Request!
       socketRef.current.send(
         JSON.stringify({
@@ -1104,59 +1002,8 @@ export const RadarView: React.FC<RadarViewProps> = ({
         })
       );
     } else {
-      // Demo / simulated peer fallback
-      setTimeout(() => {
-        const { contactData, sharedFieldsList } = extractSelectiveContactData(
-          peer.cardData || { name: peer.name, role: peer.role, company: peer.company },
-          undefined,
-          exchangeSource
-        );
-
-        const classification = buildReceivedContactClassification(peer.name, peer.company);
-
-        const newContact: CRMContact = {
-          ...contactData,
-          id: `c-p2p-${Date.now()}`,
-          name: peer.name,
-          firstName: contactData.firstName || peer.name.split(/\s+/)[0] || '',
-          lastName: contactData.lastName || peer.name.split(/\s+/).slice(1).join(' ') || '',
-          role: peer.role,
-          company: peer.company,
-          email: peer.cardData.email || `${peer.name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
-          personalEmail: contactData.personalEmail,
-          phone: peer.cardData.phone || '+1 (555) 019-2834',
-          personalPhone: contactData.personalPhone,
-          website: peer.cardData.website || 'https://example.com',
-          location: contactData.location || 'Conference Room',
-          category: classification.category,
-          isBusinessCRM: classification.isBusinessCRM,
-          dealName: classification.dealName,
-          dealStage: classification.dealStage,
-          accountStatus: classification.accountStatus,
-          notes: `Exchanged via P2P Radar Room (${peer.protocol.toUpperCase()}) at ${conferenceRoom.toUpperCase()} · ${classification.relationshipTag}. Proximity: ${peer.distanceMeters.toFixed(1)}m. Tagline: "${peer.cardData.customTagline || ''}"`,
-          source: exchangeSource,
-          status: classification.status,
-          tags: ['P2P Room', classification.relationshipTag, peer.company, peer.protocol.toUpperCase()],
-          avatarUrl: peer.avatarUrl,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          selectiveSyncInfo: {
-            isSynced: true,
-            lastSyncedAt: new Date().toISOString(),
-            senderCircle: `${conferenceRoom.toUpperCase()} Radar Peer`,
-            sharedFieldsList: sharedFieldsList.length
-              ? sharedFieldsList
-              : ['Full Name', 'Organization', 'Role', 'Email', 'Phone'],
-            version: 1,
-          },
-        };
-
-        onAddContactToCRM(newContact);
-        setExchangeState('complete');
-        setExchangeSuccessNotice(
-          `Exchanged card with ${peer.name}! Saved to ${classification.summaryDestination}.`
-        );
-      }, 750);
+      setExchangeState('idle');
+      setRoomAlert('WebSocket is reconnecting. Please check connection and try again.');
     }
   };
 
@@ -1385,7 +1232,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+    <div className="mx-auto w-full max-w-[1720px] px-3 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-6">
       {/* =========================================================================
           1. PUBLIC SCOPE HERO & "HOW IT WORKS" EXPLAINER
          ========================================================================= */}
@@ -1929,8 +1776,8 @@ export const RadarView: React.FC<RadarViewProps> = ({
             <div>
               <div className="text-xs font-bold text-white flex items-center gap-2">
                 <span>Interactive Room Radar</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60">
-                  {realLivePeers.length} Live · {allPeers.length} Total
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60 font-semibold">
+                  {realLivePeers.length} Active {realLivePeers.length === 1 ? 'Peer' : 'Peers'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
@@ -1938,29 +1785,16 @@ export const RadarView: React.FC<RadarViewProps> = ({
               </p>
             </div>
 
-            {/* Segmented Mode Toggle: Live + Demo vs Live Only */}
-            <div className="flex items-center gap-1 p-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-semibold">
+            {/* Guide & Verification Action */}
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setShowDemoPeers(true)}
-                className={`px-2 py-1 rounded transition ${
-                  showDemoPeers
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
+                onClick={() => setIsGuideOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/70 border border-indigo-700/60 hover:bg-indigo-900/60 text-indigo-300 hover:text-white text-[11px] font-semibold transition shadow-sm"
+                title="Open interactive walkthrough guide"
               >
-                Live + Demo ({realLivePeers.length + SIMULATED_CONFERENCE_PEERS.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowDemoPeers(false)}
-                className={`px-2 py-1 rounded transition ${
-                  !showDemoPeers
-                    ? 'bg-emerald-600 text-white'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Live Only ({realLivePeers.length})
+                <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                <span>How it Works</span>
               </button>
             </div>
           </div>
@@ -2022,19 +1856,13 @@ export const RadarView: React.FC<RadarViewProps> = ({
                   title={`${peer.name} (${peer.distanceMeters.toFixed(1)}m away)`}
                 >
                   <div className="relative">
-                    {peer.isRealLivePeer ? (
-                      <span className="absolute -inset-1.5 rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                    ) : (
-                      <span className="absolute -inset-1 rounded-full bg-cyan-400 opacity-40 animate-ping" />
-                    )}
+                    <span className="absolute -inset-1.5 rounded-full bg-emerald-400 opacity-75 animate-ping" />
 
                     <div
                       className={`relative h-9 w-9 rounded-full border-2 p-0.5 shadow-md ${
-                        peer.isRealLivePeer
-                          ? 'border-emerald-400 ring-2 ring-emerald-500/40 bg-emerald-950'
-                          : isSelected
+                        isSelected
                           ? 'border-cyan-400 bg-cyan-950 shadow-cyan-500/50 ring-2 ring-cyan-400/50'
-                          : 'border-slate-700 bg-slate-900 group-hover:border-cyan-400'
+                          : 'border-emerald-400 ring-2 ring-emerald-500/40 bg-emerald-950 group-hover:border-cyan-400'
                       }`}
                     >
                       <img
@@ -2044,25 +1872,17 @@ export const RadarView: React.FC<RadarViewProps> = ({
                       />
                     </div>
 
-                    {peer.isRealLivePeer && (
-                      <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-black ring-1 ring-slate-950 shadow">
-                        <Zap className="h-2 w-2 text-black fill-black" />
-                      </span>
-                    )}
+                    <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-black ring-1 ring-slate-950 shadow">
+                      <Zap className="h-2 w-2 text-black fill-black" />
+                    </span>
                   </div>
 
                   <div className="absolute left-1/2 -translate-x-1/2 top-10 hidden group-hover:block whitespace-nowrap z-30 rounded-lg bg-slate-900/95 border border-slate-700 p-2 text-[10px] text-white shadow-xl pointer-events-none">
                     <div className="flex items-center gap-1.5">
                       <span className="font-bold">{peer.name}</span>
-                      {peer.isRealLivePeer ? (
-                        <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                          LIVE DEVICE
-                        </span>
-                      ) : (
-                        <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-slate-800 text-slate-400">
-                          DEMO
-                        </span>
-                      )}
+                      <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">
+                        LIVE DEVICE
+                      </span>
                     </div>
                     <div className="text-slate-400 text-[9px] mt-0.5">
                       {peer.distanceMeters.toFixed(1)}m · {peer.role}
@@ -2371,15 +2191,9 @@ export const RadarView: React.FC<RadarViewProps> = ({
                             <span className="text-xs font-bold text-white truncate">
                               {peer.name}
                             </span>
-                            {peer.isRealLivePeer ? (
-                              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">
-                                LIVE
-                              </span>
-                            ) : (
-                              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
-                                DEMO
-                              </span>
-                            )}
+                            <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">
+                              LIVE
+                            </span>
                             {isAutoExchangedWithHost && (
                               <span className="inline-flex items-center gap-0.5 text-[8px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold">
                                 <Check className="h-2.5 w-2.5" />
@@ -2422,14 +2236,40 @@ export const RadarView: React.FC<RadarViewProps> = ({
                 })}
               </div>
             ) : (
-              <div className="py-8 text-center space-y-2">
-                <Users className="h-7 w-7 text-slate-500 mx-auto" />
-                <div className="text-xs font-semibold text-slate-300">
-                  No other live devices in this room yet
+              <div className="py-8 text-center space-y-3">
+                <div className="relative mx-auto h-12 w-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <Users className="h-6 w-6" />
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500" />
+                  </span>
                 </div>
-                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                  Click <strong>Room QR / Test 2nd Device</strong> above to join from your phone or a second browser tab, or switch to <strong>Live + Demo</strong>.
-                </p>
+                <div className="space-y-1 max-w-xs mx-auto">
+                  <div className="text-xs font-bold text-white">
+                    Radar Active — Scanning for Nearby Peers
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    No other attendees are currently connected in this room. Share your Room QR or direct invite link so nearby people can join.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsPairModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow transition"
+                  >
+                    <QrIcon className="h-3.5 w-3.5" />
+                    <span>Room QR / Pair Device</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsGuideOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>Interactive Guide</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -3099,6 +2939,15 @@ export const RadarView: React.FC<RadarViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* =========================================================================
+          INTERACTIVE WALKTHROUGH GUIDE (AUTO-OPENS ON FIRST VISIT / ON DEMAND)
+         ========================================================================= */}
+      <RadarWalkthroughModal
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
+        onOpenRoomQr={() => setIsPairModalOpen(true)}
+      />
     </div>
   );
 };

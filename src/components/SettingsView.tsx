@@ -17,6 +17,7 @@ import {
   AI_BOOSTER_PACK_PRICE,
 } from '../utils/subscription';
 import { KYCSettingsEngine } from './KYCSettingsEngine';
+import { RadarWalkthroughModal } from './RadarWalkthroughModal';
 import {
   User,
   ShieldCheck,
@@ -106,6 +107,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onToggleSettingsMenu,
 }) => {
   const [activeSubMenu, setActiveSubMenu] = useState<SettingsSubMenu>(initialSubMenu);
+  const [isRadarGuideModalOpen, setIsRadarGuideModalOpen] = useState(false);
 
   // Sub-tabs for Compliance & Privacy sub-menu
   const [complianceSubTab, setComplianceSubTab] = useState<'audit' | 'sovereignty' | 'privacy' | 'terms'>('audit');
@@ -475,56 +477,56 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Store Review Audit Items
   const appleAuditItems = [
     {
+      id: 'apple-3-1-1',
+      guideline: 'Guideline 3.1.1 & 3.1.2 — RevenueCat StoreKit 2 In-App Purchases',
+      status: 'passed',
+      description: 'Digital subscriptions (Basic $12/mo, Business $29/mo) and AI Quota Boosters ($14.99) must use Apple In-App Purchase with Restore Purchases and EULA/Privacy links.',
+      implementation: 'Wired to @revenuecat/purchases-capacitor (StoreKit 2), /api/webhooks/revenuecat, Restore Purchases handler, and clickable /privacy & /terms links.',
+    },
+    {
+      id: 'apple-4-8',
+      guideline: 'Guideline 4.8 — Sign in with Apple & Firebase Auth',
+      status: 'passed',
+      description: 'Apps offering third-party or social login must include Sign in with Apple as an equivalent privacy-preserving authentication option.',
+      implementation: 'Integrated Sign in with Apple (OAuthProvider apple.com), Google Sign-In, and Email/Password via Firebase Authentication.',
+    },
+    {
       id: 'apple-5-1-1-v',
-      guideline: 'Guideline 5.1.1(v) — In-App Account & Data Deletion',
+      guideline: 'Guideline 5.1.1(v) — In-App Account & Cloud Data Deletion',
       status: 'passed',
-      description: 'Apps supporting account data must offer a prominent, one-click mechanism to permanently delete user accounts and associated records within the app.',
-      implementation: 'Implemented via GDPR Article 17 recursive purge button with cryptographic audit token generation and immediate local memory unlinking.',
+      description: 'Apps supporting account creation must offer a prominent mechanism to permanently delete Firebase Auth accounts, Firestore documents, Storage media, and server records.',
+      implementation: 'Implemented via deleteFirebaseAccountAndCloudData() + /api/privacy/purge + standalone /delete-account web portal.',
     },
     {
-      id: 'apple-5-1-1',
-      guideline: 'Guideline 5.1.1 — Data Collection & Privacy Transparency',
+      id: 'apple-itms-91053',
+      guideline: 'ITMS-91053 — iOS Privacy Manifest (PrivacyInfo.xcprivacy)',
       status: 'passed',
-      description: 'Clear, easily accessible privacy policy outlining data collection, zero third-party tracking, and contact processing.',
-      implementation: 'In-app Privacy Policy accessible to all users, CCPA opt-out, zero telemetry trackers or ads.',
-    },
-    {
-      id: 'apple-4-2',
-      guideline: 'Guideline 4.2 — Minimum Functionality & Value',
-      status: 'passed',
-      description: 'App must offer interactive native capabilities beyond a static repackaged website.',
-      implementation: 'Hardware Web NFC tag reading/writing, WebSocket P2P radar networking, RFC 2426 vCard generator, offline QR engine, and local CRM.',
-    },
-    {
-      id: 'apple-2-1',
-      guideline: 'Guideline 2.1 — App Completeness & UI Integrity',
-      status: 'passed',
-      description: 'No broken buttons, test stubs, or placeholder text. Native responsive layout adhering to iOS Human Interface Guidelines.',
-      implementation: 'All interactive controls wired to functional handlers, single-line labels, safe area padding, and high-contrast accessibility.',
+      description: 'Mandatory declaration of Required Reason APIs (UserDefaults CA92.1, FileTimestamp C617.1, SystemBootTime 35F9.1, DiskSpace E174.1) and CoreNFC entitlements.',
+      implementation: 'Bundled ios/App/App/PrivacyInfo.xcprivacy and ios/App/App/App.entitlements (CoreNFC, Associated Domains, Sign in with Apple).',
     },
   ];
 
   const googleAuditItems = [
     {
+      id: 'google-play-billing',
+      policy: 'Google Play Payments Policy — Play Billing v7 via RevenueCat',
+      status: 'passed',
+      description: 'All digital subscriptions and consumable AI Quota Coin packs on Android must be billed via Google Play Billing Library v7+.',
+      implementation: 'Integrated via RevenueCat Google Play Billing SDK (youconnect_basic_monthly, youconnect_business_monthly, youconnect_ai_booster_50).',
+    },
+    {
       id: 'google-user-data',
-      policy: 'Google Play User Data & Account Deletion Policy',
+      policy: 'Google Play Account Deletion Policy (In-App + Web URL)',
       status: 'passed',
-      description: 'Developers must provide an in-app path for users to delete their account and associated personal data.',
-      implementation: 'Full recursive wipe irreversibly removes all profiles, contacts, and tokens from browser storage.',
+      description: 'Requires both an in-app deletion path and an external web link (/delete-account) listed in Play Console Data Safety.',
+      implementation: 'Full recursive purge removes Firebase Auth user, Firestore users/{uid}, Storage media, and server records both in-app and at /delete-account.',
     },
     {
-      id: 'google-data-safety',
-      policy: 'Google Play Data Safety Section Disclosures',
+      id: 'google-app-links',
+      policy: 'Android App Links & Hardware Permission Gating (NFC / Camera)',
       status: 'passed',
-      description: 'Accurate disclosure of data types: Contacts (optional, user-initiated), Hardware identifiers (NFC tag serial numbers), and Local storage.',
-      implementation: 'All data is stored locally in client-controlled storage with zero external advertising data transfer.',
-    },
-    {
-      id: 'google-hardware',
-      policy: 'Hardware Permission Transparency (Web NFC)',
-      status: 'passed',
-      description: 'Proper permission gating and graceful degradation when NFC hardware is absent or disabled.',
-      implementation: 'Web NFC runtime capability check with automatic fallback to high-fidelity emulation on unsupported devices.',
+      description: 'Digital Asset Links verification (/.well-known/assetlinks.json) and runtime permission checks for NFC and Camera.',
+      implementation: 'Served at /.well-known/assetlinks.json with Native Capacitor NFC plugin bridge and graceful fallback.',
     },
   ];
 
@@ -581,7 +583,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   ];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+    <div className="mx-auto w-full max-w-[1720px] px-3 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
@@ -1700,6 +1702,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </p>
                 </div>
 
+                {/* Interactive Walkthrough Guide Launch Card */}
+                <div className="rounded-xl border border-indigo-500/40 bg-gradient-to-r from-indigo-950/40 via-slate-900/60 to-cyan-950/40 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-indigo-400" />
+                      <h3 className="text-sm font-bold text-white">
+                        P2P Radar Interactive Guide
+                      </h3>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800/60 font-semibold">
+                        Step-by-Step Tour
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 max-w-xl">
+                      Learn how real zero-trust WebSocket proximity discovery works, create ephemeral rooms with auto-dissolving timers, switch broadcasting cards, and test live with your smartphone.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => setIsRadarGuideModalOpen(true)}
+                      className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-bold shadow-md transition flex items-center justify-center gap-1.5"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Launch Interactive Guide</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   {/* Discovery Mode Radio */}
                   <div className="rounded-lg bg-slate-950/80 border border-slate-800 p-4 space-y-3">
@@ -1996,6 +2026,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* P2P Radar Interactive Walkthrough Guide Modal */}
+      <RadarWalkthroughModal
+        isOpen={isRadarGuideModalOpen}
+        onClose={() => setIsRadarGuideModalOpen(false)}
+      />
     </div>
   );
 };

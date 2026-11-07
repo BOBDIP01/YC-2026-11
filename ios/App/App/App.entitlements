@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Sign in with Apple (Apple Guideline 4.8) -->
+  <key>com.apple.developer.applesignin</key>
+  <array>
+    <string>Default</string>
+  </array>
+  <!-- CoreNFC NDEF Tag Reading & Writing for Physical NFC Business Cards -->
+  <key>com.apple.developer.nfc.readersession.formats</key>
+  <array>
+    <string>NDEF</string>
+    <string>TAG</string>
+  </array>
+  <!-- Universal Links for Instant Business Card Sharing (/p/:slug) -->
+  <key>com.apple.developer.associated-domains</key>
+  <array>
+    <string>applinks:youconnect.app</string>
+    <string>webcredentials:youconnect.app</string>
+  </array>
+</dict>
+</plist>
+

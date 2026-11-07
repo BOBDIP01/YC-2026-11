@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MasterProfile, StoredPicture, SubscriptionState, AiUsageType } from '../types';
 import { enhancePhotoWithAI } from '../utils/aiPhotoEnhancer';
 import { getQuotaSummary } from '../utils/subscription';
+import { apiFetch } from '../utils/apiConfig';
 import {
   Sparkles,
   X,
@@ -489,7 +490,7 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
       let quotaInfo: string | null = null;
 
       try {
-        const res = await fetch('/api/ai/avatar', {
+        const res = await apiFetch('/api/ai/avatar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

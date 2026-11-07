@@ -619,7 +619,7 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[1720px] px-3 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 transition-all">
       {/* Notice Banner */}
       {importStatusNotice && (
         <div className="mb-6 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-300 shadow-lg backdrop-blur-md animate-fade-in">
@@ -865,7 +865,7 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
         </div>
 
         {/* Row 2: Search Input */}
-        <div className="relative w-full max-w-md">
+        <div className="relative w-full max-w-md lg:max-w-lg">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
           <input
             type="text"
@@ -919,23 +919,23 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
       ) : viewMode === 'list' ? (
         /* ======================== 1. DENSE LIST VIEW ======================== */
         <div className="rounded-2xl border border-slate-800/90 bg-slate-900/80 overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900/40">
+            <table className="w-full min-w-[1080px] text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950/80 text-slate-400 font-semibold select-none">
-                  <th className="py-3 pl-4 pr-2 w-10 text-center" title="Favorite">
+                  <th className="py-3.5 pl-4 pr-2 w-10 text-center" title="Favorite">
                     <Star className="h-3.5 w-3.5 mx-auto text-slate-500" />
                   </th>
-                  <th className="py-3 px-2 w-12 text-center" title="In Case of Emergency">
+                  <th className="py-3.5 px-2 w-12 text-center" title="In Case of Emergency">
                     <ShieldAlert className="h-3.5 w-3.5 mx-auto text-slate-500" />
                   </th>
-                  <th className="py-3 px-3 min-w-[130px]">Name</th>
-                  <th className="py-3 px-3 min-w-[120px]">Last Name</th>
-                  <th className="py-3 px-3 min-w-[125px]">Circle & Role</th>
-                  <th className="py-3 px-3 min-w-[130px] whitespace-nowrap">Phone Number</th>
-                  <th className="py-3 px-3 min-w-[145px] hidden md:table-cell">Email Address</th>
-                  <th className="py-3 px-3 hidden lg:table-cell">Directory Details</th>
-                  <th className="py-3 pl-3 pr-5 text-right whitespace-nowrap w-[164px]">Quick Actions</th>
+                  <th className="py-3.5 px-3 min-w-[140px] xl:min-w-[160px]">Name</th>
+                  <th className="py-3.5 px-3 min-w-[120px]">Last Name</th>
+                  <th className="py-3.5 px-3 min-w-[130px] xl:min-w-[160px]">Circle & Role</th>
+                  <th className="py-3.5 px-3 min-w-[140px] whitespace-nowrap">Phone Number</th>
+                  <th className="py-3.5 px-3 min-w-[170px] hidden md:table-cell">Email Address</th>
+                  <th className="py-3.5 px-3 min-w-[180px] hidden lg:table-cell">Directory Details</th>
+                  <th className="py-3.5 pl-3 pr-6 text-right whitespace-nowrap w-[185px] min-w-[185px]">Quick Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -1055,7 +1055,7 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
                             {contact.category || 'personal'}
                           </span>
                         </div>
-                        <div className="text-[11px] text-slate-400 truncate max-w-[140px]">
+                        <div className="text-[11px] text-slate-400 truncate max-w-[160px] xl:max-w-[240px] 2xl:max-w-none">
                           {contact.role || contact.company || '—'}
                         </div>
                       </td>
@@ -1082,7 +1082,7 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
                         {primaryEmail ? (
                           <a
                             href={`mailto:${primaryEmail}`}
-                            className="text-slate-300 hover:text-indigo-400 hover:underline flex items-center gap-1.5 truncate max-w-[170px]"
+                            className="text-slate-300 hover:text-indigo-400 hover:underline flex items-center gap-1.5 truncate max-w-[190px] xl:max-w-[280px] 2xl:max-w-none"
                           >
                             <Mail className="h-3 w-3 text-slate-500 shrink-0" />
                             <span className="truncate">{primaryEmail}</span>
@@ -1095,7 +1095,7 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
                       {/* Directory Details / Rubrica Custom attributes */}
                       <td className="py-3 px-3 hidden lg:table-cell">
                         {contact.rubricaFields && contact.rubricaFields.length > 0 ? (
-                          <div className="flex items-center gap-1 max-w-[175px] overflow-hidden">
+                          <div className="flex items-center gap-1.5 max-w-[240px] xl:max-w-[340px] 2xl:max-w-none overflow-hidden">
                             <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 font-mono truncate">
                               {contact.rubricaFields[0].label}: {contact.rubricaFields[0].value}
                             </span>
@@ -1106,7 +1106,7 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
                             )}
                           </div>
                         ) : contact.location ? (
-                          <span className="text-[11px] text-slate-400 truncate flex items-center gap-1 max-w-[175px]">
+                          <span className="text-[11px] text-slate-400 truncate flex items-center gap-1 max-w-[240px] xl:max-w-[340px] 2xl:max-w-none">
                             <MapPin className="h-3 w-3 text-slate-500 shrink-0" />
                             <span className="truncate">{contact.location}</span>
                           </span>
@@ -1116,8 +1116,8 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
                       </td>
 
                       {/* Quick Actions */}
-                      <td className="py-3 pl-3 pr-5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <div className="inline-flex items-center justify-end gap-2">
+                      <td className="py-3 pl-3 pr-6 text-right whitespace-nowrap w-[185px] min-w-[185px]" onClick={(e) => e.stopPropagation()}>
+                        <div className="inline-flex items-center justify-end gap-2 shrink-0">
                           {/* Single vCard Download */}
                           <button
                             onClick={(e) => handleDownloadSingleVCard(contact, e)}
@@ -1131,7 +1131,7 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
                           {!contact.isBusinessCRM ? (
                             <button
                               onClick={(e) => handleOpenPromoteModal(contact, e)}
-                              className="inline-flex h-6 w-[78px] items-center justify-center gap-1 rounded-md bg-indigo-600/10 hover:bg-indigo-600 border border-indigo-500/30 px-2 text-[10px] font-semibold text-indigo-300 hover:text-white transition shrink-0"
+                              className="inline-flex h-6 w-[80px] items-center justify-center gap-1 rounded-md bg-indigo-600/10 hover:bg-indigo-600 border border-indigo-500/30 px-2 text-[10px] font-semibold text-indigo-300 hover:text-white transition shrink-0"
                               title="Promote to Business CRM"
                             >
                               <TrendingUp className="h-3 w-3 shrink-0" />
@@ -1139,7 +1139,7 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
                             </button>
                           ) : (
                             <span
-                              className="inline-flex h-6 w-[78px] items-center justify-center rounded-md bg-indigo-950/60 border border-indigo-800/40 px-2 text-[10px] font-semibold text-indigo-300 shrink-0"
+                              className="inline-flex h-6 w-[80px] items-center justify-center rounded-md bg-indigo-950/60 border border-indigo-800/40 px-2 text-[10px] font-semibold text-indigo-300 shrink-0"
                               title="Already in Business CRM"
                             >
                               CRM
@@ -1165,7 +1165,7 @@ export const RubricaView: React.FC<RubricaViewProps> = ({
         </div>
       ) : (
         /* ======================== 2. CARD GRID VIEW ======================== */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredContacts.map((contact) => {
             const primaryPhone = contact.phone || contact.personalPhone;
             const primaryEmail = contact.email || contact.personalEmail;

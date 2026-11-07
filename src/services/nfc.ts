@@ -129,8 +129,14 @@ export interface NfcReadResult {
   }[];
 }
 
+function getNativeCapacitorNfcPlugin(): any | null {
+  if (typeof window === 'undefined') return null;
+  const plugins = (window as any).Capacitor?.Plugins;
+  return plugins?.CapacitorNfc || plugins?.NFC || null;
+}
+
 /**
- * Evaluates whether Web NFC API is supported and can operate in the current environment.
+ * Evaluates whether Native CoreNFC (Capacitor iOS/Android) or W3C Web NFC API is supported.
  */
 export function getNfcCompatibility(): NfcCompatibilityStatus {
   if (typeof window === 'undefined') {
@@ -139,6 +145,16 @@ export function getNfcCompatibility(): NfcCompatibilityStatus {
       isSecureContext: false,
       canOperate: false,
       reason: 'Server-side execution environment (window is undefined).',
+    };
+  }
+
+  // 1. Check Native Capacitor CoreNFC / Android NFC bridge first
+  const nativeNfc = getNativeCapacitorNfcPlugin();
+  if (nativeNfc) {
+    return {
+      isSupported: true,
+      isSecureContext: true,
+      canOperate: true,
     };
   }
 
@@ -162,8 +178,8 @@ export function getNfcCompatibility(): NfcCompatibilityStatus {
       isSecureContext: true,
       canOperate: false,
       reason: isIOS
-        ? 'iOS Safari/WebKit restricts direct browser Web NFC tag writing; iPhones automatically read NDEF Universal Link tags natively via iOS Background Tag Reading, or use QR / Native CoreNFC bridge.'
-        : 'Web NFC is not supported by this browser. Hardware Web NFC tag writing is supported in Chrome on Android; use QR or NDEF simulator on desktop.',
+        ? 'iOS Safari/WebKit restricts browser Web NFC; install the native iOS app (CoreNFC enabled) or scan via iOS Background Tag Reading / QR.'
+        : 'Web NFC is not supported by this browser. Hardware NFC writing is supported via Native iOS CoreNFC / Android NFC or Chrome on Android.',
     };
   }
 
@@ -281,7 +297,31 @@ export async function writeNdefMessage(
     return acc + (typeof r.data === 'string' ? new TextEncoder().encode(r.data).length : 64);
   }, 0);
 
-  if (compat.canOperate) {
+  const nativeNfc = getNativeCapacitorNfcPlugin();
+  if (nativeNfc && typeof nativeNfc.write === 'function') {
+    try {
+      onStatusUpdate?.('Native CoreNFC / Android NFC Ready: Hold your physical NFC card against the top/back of this device...');
+      const nativeRecords = records.map((r) => ({
+        type: r.recordType === 'url' ? 'U' : r.recordType === 'mime' ? r.mediaType || 'text/vcard' : 'T',
+        payload: typeof r.data === 'string' ? r.data : JSON.stringify(r.data || ''),
+      }));
+      await nativeNfc.write({ records: nativeRecords });
+      onStatusUpdate?.('NDEF message successfully written via Native CoreNFC / Android NFC bridge.');
+      return {
+        success: true,
+        isSimulated: false,
+        recordsWritten: records.length,
+        totalBytes: payloadSize,
+        message: 'Successfully written to physical NFC tag via Native CoreNFC / Android NFC.',
+      };
+    } catch (err: any) {
+      const normalized = normalizeNfcError(err);
+      onStatusUpdate?.(`Write error: ${normalized.message}`);
+      throw normalized;
+    }
+  }
+
+  if (compat.canOperate && window.NDEFReader) {
     const timeoutController = new AbortController();
     const timer = setTimeout(() => {
       timeoutController.abort();
@@ -372,7 +412,56 @@ export async function startNfcReader(
   const abortController = new AbortController();
   const compat = getNfcCompatibility();
 
-  if (compat.canOperate) {
+  const nativeNfc = getNativeCapacitorNfcPlugin();
+  if (nativeNfc && typeof nativeNfc.startScanSession === 'function') {
+    try {
+      onStatusUpdate?.('Native CoreNFC / Android NFC Reader Active: Tap an NFC card to your device...');
+      const listenerHandle =
+        typeof nativeNfc.addListener === 'function'
+          ? await nativeNfc.addListener('nfcTagScanned', (event: any) => {
+              const rawRecords: NfcReadResult['rawRecords'] = [];
+              const parsed: NfcReadResult = {
+                serialNumber: event?.tag?.id || undefined,
+                rawRecords,
+              };
+              const records = event?.tag?.message?.records || event?.records || [];
+              for (const rec of records) {
+                const content = String(rec.payload || rec.content || '');
+                rawRecords.push({
+                  recordType: rec.type || 'text',
+                  mediaType: rec.mediaType,
+                  content,
+                });
+                if (content.startsWith('http://') || content.startsWith('https://')) {
+                  parsed.url = content;
+                } else if (content.includes('BEGIN:VCARD')) {
+                  parsed.vcardString = content;
+                  parsed.contact = parseVCardToContact(content);
+                } else {
+                  parsed.text = content;
+                }
+              }
+              onCardRead(parsed);
+            })
+          : null;
+      await nativeNfc.startScanSession();
+      return () => {
+        if (listenerHandle && typeof listenerHandle.remove === 'function') {
+          listenerHandle.remove();
+        }
+        if (typeof nativeNfc.stopScanSession === 'function') {
+          nativeNfc.stopScanSession().catch(() => {});
+        }
+        onStatusUpdate?.('Native NFC scan stopped.');
+      };
+    } catch (err: any) {
+      const normalized = normalizeNfcError(err);
+      onError(normalized.message);
+      return () => {};
+    }
+  }
+
+  if (compat.canOperate && window.NDEFReader) {
     try {
       onStatusUpdate?.('NFC Reader Active: Tap an NFC card to the back of this device.');
       const NDEFReaderClass = window.NDEFReader!;

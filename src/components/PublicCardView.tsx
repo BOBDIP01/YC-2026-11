@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MasterProfile, DigitalCard, CRMContact } from '../types';
 import { DigitalCardRenderer } from './DigitalCardRenderer';
 import { generateVCardString, downloadVCard } from '../utils/vcard';
+import { apiFetch } from '../utils/apiConfig';
 import {
   Download,
   Phone,
@@ -64,6 +65,16 @@ export const PublicCardView: React.FC<PublicCardViewProps> = ({
     label: 'Save Contact to Phone',
   };
 
+  // Security sanitizer to block javascript:/vbscript:/data:text/html DOM XSS vectors in external CTAs
+  const sanitizeSafeExternalUrl = (rawUrl: string | undefined | null, fallback = ''): string => {
+    if (!rawUrl || typeof rawUrl !== 'string') return fallback;
+    const trimmed = rawUrl.trim();
+    if (/^(javascript|vbscript|data:text\/html)/i.test(trimmed)) return fallback;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(trimmed)) return `https://${trimmed}`;
+    return fallback;
+  };
+
   // Handle direct vCard import to smartphone Contacts app
   const handleSaveContact = () => {
     const vcardStr = generateVCardString(profile, card);
@@ -75,8 +86,11 @@ export const PublicCardView: React.FC<PublicCardViewProps> = ({
   const handleExecutePrimary = () => {
     switch (primaryCta.type) {
       case 'book_meeting': {
-        const target = primaryCta.url || profile.socials?.calendly || profile.workData?.socials?.calendly || 'https://calendly.com';
-        window.open(target, '_blank', 'noopener,noreferrer');
+        const target = sanitizeSafeExternalUrl(
+          primaryCta.url || profile.socials?.calendly || profile.workData?.socials?.calendly,
+          'https://calendly.com'
+        );
+        if (target) window.open(target, '_blank', 'noopener,noreferrer');
         break;
       }
       case 'whatsapp': {
@@ -99,7 +113,8 @@ export const PublicCardView: React.FC<PublicCardViewProps> = ({
       }
       case 'visit_website':
       case 'custom': {
-        if (primaryCta.url) window.open(primaryCta.url, '_blank', 'noopener,noreferrer');
+        const safeTarget = sanitizeSafeExternalUrl(primaryCta.url);
+        if (safeTarget) window.open(safeTarget, '_blank', 'noopener,noreferrer');
         break;
       }
       case 'save_contact':
@@ -137,7 +152,7 @@ export const PublicCardView: React.FC<PublicCardViewProps> = ({
 
     // Also send to server reciprocal endpoint
     try {
-      await fetch('/api/cards/reciprocal', {
+      await apiFetch('/api/cards/reciprocal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -283,7 +298,7 @@ export const PublicCardView: React.FC<PublicCardViewProps> = ({
                   <div className="p-6 text-center space-y-2">
                     <p className="text-xs text-slate-300">Open external video greeting:</p>
                     <a
-                      href={videoIntro}
+                      href={sanitizeSafeExternalUrl(videoIntro, '#')}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold"

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DigitalCard, SubscriptionState, AiUsageType } from '../types';
 import { getQuotaSummary } from '../utils/subscription';
+import { apiFetch } from '../utils/apiConfig';
 import {
   Sparkles,
   X,
@@ -138,7 +139,7 @@ export const AIBannerModal: React.FC<AIBannerModalProps> = ({
     setErrorMsg(null);
     setSaveSuccessMsg(null);
     try {
-      const res = await fetch('/api/ai/banner', {
+      const res = await apiFetch('/api/ai/banner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

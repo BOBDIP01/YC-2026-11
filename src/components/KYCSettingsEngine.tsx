@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MasterProfile, KycTraceabilityRecord } from '../types';
+import { apiFetch } from '../utils/apiConfig';
 import {
   ShieldCheck,
   Check,
@@ -114,7 +115,7 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
         profileId: profile.id || '',
         traceabilityId: profile.kycVerification?.traceabilityId || '',
       });
-      const res = await fetch(`/api/kyc/records?${params.toString()}`);
+      const res = await apiFetch(`/api/kyc/records?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.records)) {
@@ -384,7 +385,7 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
       await new Promise((r) => setTimeout(r, 450));
       setVerificationStage('3/4 · Comparing Document Portrait against Live Selfie Shot (1:1 Biometrics)...');
 
-      const res = await fetch('/api/kyc/verify', {
+      const res = await apiFetch('/api/kyc/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -471,7 +472,7 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
     const traceId = profile.kycVerification?.traceabilityId;
     if (traceId) {
       try {
-        await fetch(
+        await apiFetch(
           `/api/kyc/records/${encodeURIComponent(traceId)}?profileId=${encodeURIComponent(profile.id || '')}`,
           { method: 'DELETE' }
         );
