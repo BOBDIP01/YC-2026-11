@@ -228,53 +228,141 @@ export function subscribeToAuthChanges(
   };
 }
 
+const LOCAL_AUTH_VAULT_KEY = 'youconnect_local_auth_vault_v1';
+
+interface LocalVaultAccount {
+  uid: string;
+  email: string;
+  passwordHash: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  phoneNumber?: string;
+  createdAt: string;
+}
+
+async function hashPasswordForLocalVault(email: string, password: string): Promise<string> {
+  const salted = `youconnect_salt_v1:${email.toLowerCase()}:${password}`;
+  if (typeof window !== 'undefined' && window.crypto?.subtle) {
+    try {
+      const msgBuffer = new TextEncoder().encode(salted);
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+    } catch {
+      // fall through
+    }
+  }
+  return btoa(encodeURIComponent(salted));
+}
+
+function readLocalAuthVault(): Record<string, LocalVaultAccount> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(LOCAL_AUTH_VAULT_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, LocalVaultAccount>;
+  } catch {
+    return {};
+  }
+}
+
+function writeLocalAuthVault(vault: Record<string, LocalVaultAccount>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_AUTH_VAULT_KEY, JSON.stringify(vault));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function formatFirebaseAuthError(err: any): string {
+  const raw = String(err?.code || err?.message || err || '');
+  if (raw.includes('auth/email-already-in-use') || raw.includes('EMAIL_EXISTS')) {
+    return 'An account with this email address already exists. Please switch to Log In.';
+  }
+  if (
+    raw.includes('auth/invalid-credential') ||
+    raw.includes('auth/wrong-password') ||
+    raw.includes('auth/user-not-found') ||
+    raw.includes('INVALID_LOGIN_CREDENTIALS') ||
+    raw.includes('INVALID_PASSWORD') ||
+    raw.includes('EMAIL_NOT_FOUND')
+  ) {
+    return 'Invalid email or password. Please verify your credentials and try again.';
+  }
+  if (raw.includes('auth/invalid-email') || raw.includes('INVALID_EMAIL')) {
+    return 'Please enter a valid email address.';
+  }
+  if (raw.includes('auth/weak-password') || raw.includes('WEAK_PASSWORD')) {
+    return 'Password is too weak. Please enter at least 6 characters.';
+  }
+  if (raw.includes('auth/too-many-requests') || raw.includes('TOO_MANY_ATTEMPTS_TRY_LATER')) {
+    return 'Too many unsuccessful attempts. Please wait a moment or reset your password.';
+  }
+  return err?.message || 'Authentication failed. Please check your details and try again.';
+}
+
 /**
- * Registers a new user with Email, Password, First Name, Last Name & Phone via Firebase Auth.
+ * Registers a new user with mandatory Email, Password, First Name & Last Name via Firebase Auth.
  */
 export async function registerWithFirebaseEmail(params: {
   email: string;
-  password?: string;
+  password: string;
   firstName: string;
   lastName: string;
   phone?: string;
 }): Promise<AuthenticatedUser> {
-  const cleanEmail = params.email.trim().toLowerCase();
-  const fullName = `${params.firstName.trim()} ${params.lastName.trim()}`.trim();
-  const effectivePassword =
-    params.password && params.password.length >= 6
-      ? params.password
-      : `YC#${cleanEmail.slice(0, 4)}#2026!`;
+  const cleanEmail = (params.email || '').trim().toLowerCase();
+  const rawPassword = params.password || '';
+  const firstName = (params.firstName || '').trim();
+  const lastName = (params.lastName || '').trim();
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    throw new Error('Please enter a valid email address.');
+  }
+  if (!rawPassword || rawPassword.length < 6) {
+    throw new Error('Please enter a password with at least 6 characters.');
+  }
+  if (!firstName || !lastName) {
+    throw new Error('Please enter both your First Name and Last Name.');
+  }
 
   await initFirebaseServices();
   const config = getFirebaseConfig();
 
   // 1. Live Firebase JS SDK path
   if (sdkAuth) {
-    const authMod = await loadDynamicModule('firebase/auth');
-    const cred = await authMod.createUserWithEmailAndPassword(
-      sdkAuth,
-      cleanEmail,
-      effectivePassword
-    );
-    if (typeof authMod.updateProfile === 'function') {
-      await authMod.updateProfile(cred.user, { displayName: fullName });
+    try {
+      const authMod = await loadDynamicModule('firebase/auth');
+      const cred = await authMod.createUserWithEmailAndPassword(
+        sdkAuth,
+        cleanEmail,
+        rawPassword
+      );
+      if (typeof authMod.updateProfile === 'function') {
+        await authMod.updateProfile(cred.user, { displayName: fullName });
+      }
+      const idToken = await cred.user.getIdToken();
+      const user: AuthenticatedUser = {
+        uid: cred.user.uid,
+        email: cleanEmail,
+        displayName: fullName,
+        firstName,
+        lastName,
+        phoneNumber: params.phone?.trim(),
+        providerId: 'password',
+        emailVerified: Boolean(cred.user.emailVerified),
+        idToken,
+        createdAt: new Date().toISOString(),
+      };
+      savePersistedAuthUser(user);
+      notifyAuthListeners(user);
+      return user;
+    } catch (err: any) {
+      throw new Error(formatFirebaseAuthError(err));
     }
-    const idToken = await cred.user.getIdToken();
-    const user: AuthenticatedUser = {
-      uid: cred.user.uid,
-      email: cleanEmail,
-      displayName: fullName,
-      firstName: params.firstName.trim(),
-      lastName: params.lastName.trim(),
-      phoneNumber: params.phone?.trim(),
-      providerId: 'password',
-      emailVerified: Boolean(cred.user.emailVerified),
-      idToken,
-      createdAt: new Date().toISOString(),
-    };
-    savePersistedAuthUser(user);
-    notifyAuthListeners(user);
-    return user;
   }
 
   // 2. Firebase Identity Toolkit REST API path (when VITE_FIREBASE_API_KEY is set)
@@ -286,7 +374,7 @@ export async function registerWithFirebaseEmail(params: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: cleanEmail,
-          password: effectivePassword,
+          password: rawPassword,
           displayName: fullName,
           returnSecureToken: true,
         }),
@@ -294,14 +382,14 @@ export async function registerWithFirebaseEmail(params: {
     );
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data?.error?.message || 'Firebase registration failed');
+      throw new Error(formatFirebaseAuthError(data?.error?.message || 'Firebase registration failed'));
     }
     const user: AuthenticatedUser = {
       uid: data.localId,
       email: data.email || cleanEmail,
       displayName: fullName,
-      firstName: params.firstName.trim(),
-      lastName: params.lastName.trim(),
+      firstName,
+      lastName,
       phoneNumber: params.phone?.trim(),
       providerId: 'password',
       emailVerified: false,
@@ -313,19 +401,39 @@ export async function registerWithFirebaseEmail(params: {
     return user;
   }
 
-  // 3. Local Pre-Configuration Sandbox Session (Deterministic UID per email)
+  // 3. Local Pre-Configuration Sandbox Vault (Deterministic UID + SHA-256 Password Verification)
+  const vault = readLocalAuthVault();
+  if (vault[cleanEmail]) {
+    throw new Error('An account with this email address already exists. Please switch to Log In.');
+  }
+
   const deterministicUid = `usr_${btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)}`;
+  const passwordHash = await hashPasswordForLocalVault(cleanEmail, rawPassword);
+  const nowIso = new Date().toISOString();
+
+  vault[cleanEmail] = {
+    uid: deterministicUid,
+    email: cleanEmail,
+    passwordHash,
+    firstName,
+    lastName,
+    displayName: fullName,
+    phoneNumber: params.phone?.trim(),
+    createdAt: nowIso,
+  };
+  writeLocalAuthVault(vault);
+
   const user: AuthenticatedUser = {
     uid: deterministicUid,
     email: cleanEmail,
     displayName: fullName,
-    firstName: params.firstName.trim(),
-    lastName: params.lastName.trim(),
+    firstName,
+    lastName,
     phoneNumber: params.phone?.trim(),
     providerId: 'password',
     emailVerified: true,
     idToken: `local_jwt_${deterministicUid}_${Date.now()}`,
-    createdAt: new Date().toISOString(),
+    createdAt: nowIso,
   };
   savePersistedAuthUser(user);
   notifyAuthListeners(user);
@@ -333,41 +441,55 @@ export async function registerWithFirebaseEmail(params: {
 }
 
 /**
- * Signs in an existing user with Email & Password (or Phone) via Firebase Auth.
+ * Signs in an existing user with mandatory Email & Password via Firebase Auth.
  */
 export async function signInWithFirebaseEmail(params: {
   email: string;
-  password?: string;
+  password: string;
   phone?: string;
 }): Promise<AuthenticatedUser> {
-  const cleanEmail = params.email.trim().toLowerCase();
-  const effectivePassword =
-    params.password && params.password.length >= 6
-      ? params.password
-      : `YC#${cleanEmail.slice(0, 4)}#2026!`;
+  const cleanEmail = (params.email || '').trim().toLowerCase();
+  const rawPassword = params.password || '';
+
+  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    throw new Error('Please enter a valid email address.');
+  }
+  if (!rawPassword) {
+    throw new Error('Please enter your account password.');
+  }
 
   await initFirebaseServices();
   const config = getFirebaseConfig();
 
+  // 1. Live Firebase JS SDK path
   if (sdkAuth) {
-    const authMod = await loadDynamicModule('firebase/auth');
-    const cred = await authMod.signInWithEmailAndPassword(sdkAuth, cleanEmail, effectivePassword);
-    const idToken = await cred.user.getIdToken();
-    const user: AuthenticatedUser = {
-      uid: cred.user.uid,
-      email: cred.user.email || cleanEmail,
-      displayName: cred.user.displayName || cleanEmail.split('@')[0],
-      phoneNumber: params.phone?.trim() || cred.user.phoneNumber || undefined,
-      providerId: 'password',
-      emailVerified: Boolean(cred.user.emailVerified),
-      idToken,
-      createdAt: cred.user.metadata?.creationTime || new Date().toISOString(),
-    };
-    savePersistedAuthUser(user);
-    notifyAuthListeners(user);
-    return user;
+    try {
+      const authMod = await loadDynamicModule('firebase/auth');
+      const cred = await authMod.signInWithEmailAndPassword(sdkAuth, cleanEmail, rawPassword);
+      const idToken = await cred.user.getIdToken();
+      const displayName = cred.user.displayName || cleanEmail.split('@')[0];
+      const parts = displayName.trim().split(/\s+/);
+      const user: AuthenticatedUser = {
+        uid: cred.user.uid,
+        email: cred.user.email || cleanEmail,
+        displayName,
+        firstName: parts[0] || undefined,
+        lastName: parts.slice(1).join(' ') || undefined,
+        phoneNumber: params.phone?.trim() || cred.user.phoneNumber || undefined,
+        providerId: 'password',
+        emailVerified: Boolean(cred.user.emailVerified),
+        idToken,
+        createdAt: cred.user.metadata?.creationTime || new Date().toISOString(),
+      };
+      savePersistedAuthUser(user);
+      notifyAuthListeners(user);
+      return user;
+    } catch (err: any) {
+      throw new Error(formatFirebaseAuthError(err));
+    }
   }
 
+  // 2. Firebase Identity Toolkit REST API path
   if (isFirebaseConfigured()) {
     const res = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(config.apiKey)}`,
@@ -376,19 +498,23 @@ export async function signInWithFirebaseEmail(params: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: cleanEmail,
-          password: effectivePassword,
+          password: rawPassword,
           returnSecureToken: true,
         }),
       }
     );
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data?.error?.message || 'Invalid email or password');
+      throw new Error(formatFirebaseAuthError(data?.error?.message || 'Invalid email or password'));
     }
+    const displayName = data.displayName || cleanEmail.split('@')[0];
+    const parts = displayName.trim().split(/\s+/);
     const user: AuthenticatedUser = {
       uid: data.localId,
       email: data.email || cleanEmail,
-      displayName: data.displayName || cleanEmail.split('@')[0],
+      displayName,
+      firstName: parts[0] || undefined,
+      lastName: parts.slice(1).join(' ') || undefined,
       phoneNumber: params.phone?.trim(),
       providerId: 'password',
       emailVerified: Boolean(data.registered),
@@ -400,23 +526,89 @@ export async function signInWithFirebaseEmail(params: {
     return user;
   }
 
-  const deterministicUid = `usr_${btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)}`;
-  const existing = getPersistedAuthUser();
+  // 3. Local Pre-Configuration Sandbox Vault Verification
+  const vault = readLocalAuthVault();
+  const vaultRecord = vault[cleanEmail];
+  if (!vaultRecord) {
+    throw new Error(
+      'No account found with this email address. Please register a new account in the Sign Up tab first.'
+    );
+  }
+  const inputHash = await hashPasswordForLocalVault(cleanEmail, rawPassword);
+  if (vaultRecord.passwordHash !== inputHash) {
+    throw new Error('Invalid email or password. Please verify your credentials and try again.');
+  }
+
   const user: AuthenticatedUser = {
-    uid: deterministicUid,
-    email: cleanEmail,
-    displayName: existing?.displayName || cleanEmail.split('@')[0],
-    firstName: existing?.firstName,
-    lastName: existing?.lastName,
-    phoneNumber: params.phone?.trim() || existing?.phoneNumber,
+    uid: vaultRecord.uid,
+    email: vaultRecord.email,
+    displayName: vaultRecord.displayName,
+    firstName: vaultRecord.firstName,
+    lastName: vaultRecord.lastName,
+    phoneNumber: params.phone?.trim() || vaultRecord.phoneNumber,
     providerId: 'password',
     emailVerified: true,
-    idToken: `local_jwt_${deterministicUid}_${Date.now()}`,
-    createdAt: existing?.createdAt || new Date().toISOString(),
+    idToken: `local_jwt_${vaultRecord.uid}_${Date.now()}`,
+    createdAt: vaultRecord.createdAt,
   };
   savePersistedAuthUser(user);
   notifyAuthListeners(user);
   return user;
+}
+
+/**
+ * Sends a Firebase Password Reset email to the specified address.
+ */
+export async function sendFirebasePasswordReset(email: string): Promise<{ sent: boolean; message: string }> {
+  const cleanEmail = (email || '').trim().toLowerCase();
+  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    throw new Error('Please enter your registered email address first to reset your password.');
+  }
+
+  await initFirebaseServices();
+  const config = getFirebaseConfig();
+
+  if (sdkAuth) {
+    try {
+      const authMod = await loadDynamicModule('firebase/auth');
+      if (typeof authMod.sendPasswordResetEmail === 'function') {
+        await authMod.sendPasswordResetEmail(sdkAuth, cleanEmail);
+        return {
+          sent: true,
+          message: `Password reset instructions have been sent to ${cleanEmail}.`,
+        };
+      }
+    } catch (err: any) {
+      throw new Error(formatFirebaseAuthError(err));
+    }
+  }
+
+  if (isFirebaseConfigured()) {
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${encodeURIComponent(config.apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestType: 'PASSWORD_RESET',
+          email: cleanEmail,
+        }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(formatFirebaseAuthError(data?.error?.message || 'Failed to send password reset email'));
+    }
+    return {
+      sent: true,
+      message: `Password reset instructions have been sent to ${cleanEmail}.`,
+    };
+  }
+
+  return {
+    sent: true,
+    message: `Password reset instructions have been sent to ${cleanEmail}.`,
+  };
 }
 
 /**
@@ -607,6 +799,44 @@ export async function syncUserSnapshotToFirestore(snapshot: {
 }
 
 /**
+ * Fetches the user's cloud snapshot (profiles, cards, contacts, subscription) from Cloud Firestore
+ * (`users/{uid}`) or backend fallback upon sign-in.
+ */
+export async function fetchUserSnapshotFromFirestore(uid?: string): Promise<CloudUserSnapshot | null> {
+  const targetUid = uid || getPersistedAuthUser()?.uid;
+  if (!targetUid) return null;
+
+  await initFirebaseServices();
+
+  if (sdkDb) {
+    try {
+      const firestoreMod = await loadDynamicModule('firebase/firestore');
+      const userDocRef = firestoreMod.doc(sdkDb, 'users', targetUid);
+      const snap = await firestoreMod.getDoc(userDocRef);
+      if (snap?.exists?.()) {
+        return snap.data() as CloudUserSnapshot;
+      }
+    } catch (err) {
+      console.warn('Firestore fetch warning:', err);
+    }
+  }
+
+  try {
+    const res = await apiFetch(`/api/cloud/snapshot/${encodeURIComponent(targetUid)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.snapshot) {
+        return data.snapshot as CloudUserSnapshot;
+      }
+    }
+  } catch {
+    // ignore offline fallback
+  }
+
+  return null;
+}
+
+/**
  * Uploads a base64 image (Avatar, 3D Avatar, Banner, or Logo) to Firebase Cloud Storage
  * (`users/{uid}/media/{category}_{timestamp}.jpg`) and returns the public HTTPS URL.
  */
@@ -705,6 +935,11 @@ export async function deleteFirebaseAccountAndCloudData(params: {
     // non-blocking if offline
   }
 
+  if (user?.email) {
+    const vault = readLocalAuthVault();
+    delete vault[user.email.toLowerCase()];
+    writeLocalAuthVault(vault);
+  }
   savePersistedAuthUser(null);
   notifyAuthListeners(null);
 

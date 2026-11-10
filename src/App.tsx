@@ -32,6 +32,8 @@ import {
   subscribeToAuthChanges,
   registerWithFirebaseEmail,
   signInWithFirebaseEmail,
+  sendFirebasePasswordReset,
+  fetchUserSnapshotFromFirestore,
   signInWithAppleFirebase,
   signInWithGoogleFirebase,
   signOutFirebase,
@@ -338,9 +340,11 @@ export default function App() {
   const [signInEmailInput, setSignInEmailInput] = useState('');
   const [signInPhoneInput, setSignInPhoneInput] = useState('');
   const [authPasswordInput, setAuthPasswordInput] = useState('');
+  const [authConfirmPasswordInput, setAuthConfirmPasswordInput] = useState('');
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [authSuccessMessage, setAuthSuccessMessage] = useState<string | null>(null);
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
   const [authUser, setAuthUser] = useState<AuthenticatedUser | null>(null);
-  const [enableKydBinding, setEnableKydBinding] = useState(true);
 
   const [betaForm, setBetaForm] = useState({
     firstName: '',
@@ -1051,31 +1055,25 @@ export default function App() {
         onCreatePersonaClick={() => setIsCreatePersonaModalOpen(true)}
         subscription={subscription}
         onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
-        onOpenAuthModal={() => {
-          const parts = (currentProfile.name || '').trim().split(/\s+/);
-          setBetaForm({
-            firstName:
-              currentProfile.personalData?.firstName ||
-              currentProfile.firstName ||
-              parts[0] ||
-              '',
-            lastName:
-              currentProfile.personalData?.lastName ||
-              currentProfile.lastName ||
-              parts.slice(1).join(' ') ||
-              '',
-            personalEmail:
-              currentProfile.email || currentProfile.personalData?.email || '',
-            personalPhone:
-              currentProfile.phone || currentProfile.personalData?.phone || '',
-          });
-          setSignInEmailInput(
-            currentProfile.email || currentProfile.personalData?.email || ''
-          );
-          setSignInPhoneInput(
-            currentProfile.phone || currentProfile.personalData?.phone || ''
-          );
+        authUser={authUser}
+        onOpenAuthModal={(mode) => {
+          if (mode) {
+            setAuthTabMode(mode);
+          }
+          if (authUser) {
+            const parts = (authUser.displayName || '').trim().split(/\s+/);
+            setBetaForm({
+              firstName: authUser.firstName || parts[0] || '',
+              lastName: authUser.lastName || parts.slice(1).join(' ') || '',
+              personalEmail: authUser.email || '',
+              personalPhone: authUser.phoneNumber || '',
+            });
+            setSignInEmailInput(authUser.email || '');
+          }
+          setAuthPasswordInput('');
+          setAuthConfirmPasswordInput('');
           setBetaFormError(null);
+          setAuthSuccessMessage(null);
           setIsBetaScratchOnboardingOpen(true);
         }}
       />
@@ -1223,23 +1221,15 @@ export default function App() {
         currentCardCount={cards.length}
       />
 
-      {/* Sign-In & Sign-On (Registration) Initial Page integrated with Firebase Auth, Sign in with Apple (Guideline 4.8) & KYD */}
+      {/* Sign-In & Sign-Up (Registration) Modal integrated with Firebase Auth & Sign in with Apple (Guideline 4.8) */}
       {isBetaScratchOnboardingOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg rounded-2xl border border-indigo-500/40 bg-slate-900 p-6 shadow-2xl text-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
               <div>
-                <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-indigo-500/20 border border-indigo-500/40 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-indigo-300">
-                    FIREBASE AUTH & KYD · SIGN IN / SIGN ON
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono text-emerald-300">
-                    {isFirebaseConfigured() ? 'Firebase Live Project' : 'Firebase SDK Ready'}
-                  </span>
-                </div>
-                <h2 className="text-lg font-bold text-white">YouConnect Identity Portal</h2>
+                <h2 className="text-lg font-bold text-white">YouConnect Account</h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Sign On (register as a new user) or Sign In with Apple, Google, or Email. Only your 4 registration fields (Name, Last Name, Email, Phone Number) are pre-filled in your Master Profile — all other fields and images start completely blank.
+                  Create a new account or log in with Apple, Google, or your Email & Password.
                 </p>
               </div>
               <button
@@ -1255,11 +1245,13 @@ export default function App() {
               <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3.5 py-2.5 text-xs">
                 <div className="min-w-0">
                   <div className="font-bold text-emerald-300 truncate">
-                    Authenticated: {authUser.displayName || authUser.email}
+                    Signed in as {authUser.displayName || authUser.email}
                   </div>
-                  <div className="text-[10px] font-mono text-slate-400 truncate">
-                    UID: {authUser.uid} · Provider: {authUser.providerId}
-                  </div>
+                  {authUser.displayName && authUser.email && (
+                    <div className="text-[11px] text-slate-400 truncate">
+                      {authUser.email}
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -1354,13 +1346,14 @@ export default function App() {
               </button>
             </div>
 
-            {/* Sign On (Register) vs Sign In Switcher */}
+            {/* Sign Up (Register) vs Log In Switcher */}
             <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
               <button
                 type="button"
                 onClick={() => {
                   setAuthTabMode('signon');
                   setBetaFormError(null);
+                  setAuthSuccessMessage(null);
                 }}
                 className={`py-2 px-3 rounded-lg font-bold transition ${
                   authTabMode === 'signon'
@@ -1368,13 +1361,14 @@ export default function App() {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Sign On (Register Account)
+                Sign Up (New User)
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setAuthTabMode('signin');
                   setBetaFormError(null);
+                  setAuthSuccessMessage(null);
                 }}
                 className={`py-2 px-3 rounded-lg font-bold transition ${
                   authTabMode === 'signin'
@@ -1382,7 +1376,7 @@ export default function App() {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Sign In (Existing Identity)
+                Log In (Existing User)
               </button>
             </div>
 
@@ -1392,15 +1386,22 @@ export default function App() {
               </div>
             )}
 
+            {authSuccessMessage && (
+              <div className="rounded-lg border border-emerald-500/40 bg-emerald-950/50 px-3 py-2 text-xs text-emerald-200">
+                {authSuccessMessage}
+              </div>
+            )}
+
             {authTabMode === 'signon' ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div>
                     <label className="block font-semibold text-slate-300 mb-1">
-                      Name (First Name) <span className="text-rose-400">*</span>
+                      First Name <span className="text-rose-400">*</span>
                     </label>
                     <input
                       type="text"
+                      autoComplete="given-name"
                       value={betaForm.firstName}
                       onChange={(e) => setBetaForm((prev) => ({ ...prev, firstName: e.target.value }))}
                       placeholder="e.g. Marco"
@@ -1413,6 +1414,7 @@ export default function App() {
                     </label>
                     <input
                       type="text"
+                      autoComplete="family-name"
                       value={betaForm.lastName}
                       onChange={(e) => setBetaForm((prev) => ({ ...prev, lastName: e.target.value }))}
                       placeholder="e.g. Rossi"
@@ -1421,10 +1423,11 @@ export default function App() {
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-300 mb-1">
-                      Email <span className="text-rose-400">*</span>
+                      Email Address <span className="text-rose-400">*</span>
                     </label>
                     <input
                       type="email"
+                      autoComplete="email"
                       value={betaForm.personalEmail}
                       onChange={(e) =>
                         setBetaForm((prev) => ({ ...prev, personalEmail: e.target.value }))
@@ -1435,10 +1438,11 @@ export default function App() {
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-300 mb-1">
-                      Phone Number <span className="text-rose-400">*</span>
+                      Phone Number <span className="text-slate-500 font-normal">(Optional)</span>
                     </label>
                     <input
                       type="tel"
+                      autoComplete="tel"
                       value={betaForm.personalPhone}
                       onChange={(e) =>
                         setBetaForm((prev) => ({ ...prev, personalPhone: e.target.value }))
@@ -1447,35 +1451,42 @@ export default function App() {
                       className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="block font-semibold text-slate-300 mb-1">
-                      Account Password (Optional for KYD · 6+ chars for Firebase Cloud Auth)
-                    </label>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-semibold text-slate-300">
+                        Password (6+ chars) <span className="text-rose-400">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowAuthPassword((prev) => !prev)}
+                        className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300"
+                      >
+                        {showAuthPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
                     <input
-                      type="password"
+                      type={showAuthPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       value={authPasswordInput}
                       onChange={(e) => setAuthPasswordInput(e.target.value)}
-                      placeholder="••••••••"
+                      placeholder="Minimum 6 characters"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1">
+                      Confirm Password <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type={showAuthPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      value={authConfirmPasswordInput}
+                      onChange={(e) => setAuthConfirmPasswordInput(e.target.value)}
+                      placeholder="Re-enter password"
                       className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
                 </div>
-
-                {/* KYD & Identity Settings Binding Option */}
-                <label className="flex items-start gap-2.5 rounded-xl border border-indigo-500/30 bg-indigo-950/25 p-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={enableKydBinding}
-                    onChange={(e) => setEnableKydBinding(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <div className="text-[11px] leading-relaxed text-slate-300">
-                    <span className="font-bold text-indigo-200 block">
-                      Bind KYD (Know Your Device) & Start Clean-Slate Master Profile
-                    </span>
-                    Populates ONLY your Name, Last Name, Email, and Phone Number into your Master Profile and starter card. All other fields and images remain empty for you to customize.
-                  </div>
-                </label>
 
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-3 border-t border-slate-800 text-xs">
                   <button
@@ -1498,21 +1509,38 @@ export default function App() {
                       const lName = betaForm.lastName.trim();
                       const pEmail = betaForm.personalEmail.trim();
                       const pPhone = betaForm.personalPhone.trim();
-                      if (!fName || !lName || !pEmail || !pPhone) {
+                      const pwd = authPasswordInput;
+                      const confirmPwd = authConfirmPasswordInput;
+
+                      if (!fName || !lName || !pEmail || !pwd) {
                         setBetaFormError(
-                          'Please enter your Name (First Name), Last Name, Email, and Phone Number to complete Sign-On registration.'
+                          'Please enter your First Name, Last Name, Email Address, and Password to create your account.'
                         );
                         return;
                       }
+                      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pEmail)) {
+                        setBetaFormError('Please enter a valid email address.');
+                        return;
+                      }
+                      if (pwd.length < 6) {
+                        setBetaFormError('Your password must be at least 6 characters long.');
+                        return;
+                      }
+                      if (pwd !== confirmPwd) {
+                        setBetaFormError('Passwords do not match. Please verify your password confirmation.');
+                        return;
+                      }
+
                       setBetaFormError(null);
+                      setAuthSuccessMessage(null);
                       setIsAuthSubmitting(true);
                       try {
                         const fbUser = await registerWithFirebaseEmail({
                           email: pEmail,
-                          password: authPasswordInput || undefined,
+                          password: pwd,
                           firstName: fName,
                           lastName: lName,
-                          phone: pPhone,
+                          phone: pPhone || undefined,
                         });
                         const fullName = `${fName} ${lName}`.trim();
 
@@ -1525,7 +1553,6 @@ export default function App() {
                             fullName,
                             email: pEmail,
                             phone: pPhone,
-                            kydBound: enableKydBinding,
                             registeredAt: new Date().toISOString(),
                           })
                         );
@@ -1550,6 +1577,8 @@ export default function App() {
                         setCards([cleanCard]);
                         setActiveCardId(cleanCard.id);
                         setContacts([]);
+                        setAuthPasswordInput('');
+                        setAuthConfirmPasswordInput('');
 
                         setIsBetaScratchOnboardingOpen(false);
                         if (typeof window !== 'undefined') {
@@ -1563,7 +1592,7 @@ export default function App() {
                     }}
                     className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition shadow-lg shadow-indigo-600/30 disabled:opacity-50"
                   >
-                    {isAuthSubmitting ? 'Creating Account...' : 'Complete Sign On & Save Identity'}
+                    {isAuthSubmitting ? 'Creating Account...' : 'Create Account with Email & Password'}
                   </button>
                 </div>
               </>
@@ -1572,10 +1601,11 @@ export default function App() {
                 <div className="space-y-3 text-xs">
                   <div>
                     <label className="block font-semibold text-slate-300 mb-1">
-                      Registered Email Address <span className="text-rose-400">*</span>
+                      Email Address <span className="text-rose-400">*</span>
                     </label>
                     <input
                       type="email"
+                      autoComplete="email"
                       value={signInEmailInput}
                       onChange={(e) => setSignInEmailInput(e.target.value)}
                       placeholder="you@example.com"
@@ -1583,26 +1613,47 @@ export default function App() {
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold text-slate-300 mb-1">
-                      Registered Phone Number <span className="text-rose-400">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-semibold text-slate-300">
+                        Password <span className="text-rose-400">*</span>
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowAuthPassword((prev) => !prev)}
+                          className="text-[11px] font-semibold text-slate-400 hover:text-white"
+                        >
+                          {showAuthPassword ? 'Hide' : 'Show'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const em = signInEmailInput.trim();
+                            if (!em) {
+                              setBetaFormError('Please enter your Email Address above first, then tap Forgot Password.');
+                              return;
+                            }
+                            setBetaFormError(null);
+                            setAuthSuccessMessage(null);
+                            try {
+                              const res = await sendFirebasePasswordReset(em);
+                              setAuthSuccessMessage(res.message);
+                            } catch (err: any) {
+                              setBetaFormError(err?.message || 'Could not send password reset email.');
+                            }
+                          }}
+                          className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                    </div>
                     <input
-                      type="tel"
-                      value={signInPhoneInput}
-                      onChange={(e) => setSignInPhoneInput(e.target.value)}
-                      placeholder="+1 555 019 2831"
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-300 mb-1">
-                      Account Password (Optional for KYD)
-                    </label>
-                    <input
-                      type="password"
+                      type={showAuthPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
                       value={authPasswordInput}
                       onChange={(e) => setAuthPasswordInput(e.target.value)}
-                      placeholder="••••••••"
+                      placeholder="Enter your password"
                       className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
@@ -1621,67 +1672,95 @@ export default function App() {
                     disabled={isAuthSubmitting}
                     onClick={async () => {
                       const em = signInEmailInput.trim();
-                      const ph = signInPhoneInput.trim();
-                      if (!em || !ph) {
-                        setBetaFormError('Please enter your Email and Phone Number to Sign In.');
+                      const pwd = authPasswordInput;
+                      if (!em || !pwd) {
+                        setBetaFormError('Please enter both your Email Address and Password to Log In.');
                         return;
                       }
                       setBetaFormError(null);
+                      setAuthSuccessMessage(null);
                       setIsAuthSubmitting(true);
                       try {
-                        await signInWithFirebaseEmail({
+                        const fbUser = await signInWithFirebaseEmail({
                           email: em,
-                          password: authPasswordInput || undefined,
-                          phone: ph,
+                          password: pwd,
+                          phone: signInPhoneInput.trim() || undefined,
                         });
-                        let savedAcc: any = null;
-                        try {
-                          const raw = localStorage.getItem('youconnect_registered_account_v1');
-                          if (raw) savedAcc = JSON.parse(raw);
-                        } catch {
-                          // ignore
-                        }
-                        const fName =
-                          savedAcc?.firstName ||
-                          currentProfile.personalData?.firstName ||
-                          currentProfile.firstName ||
-                          currentProfile.name.split(' ')[0] ||
-                          'Verified';
-                        const lName =
-                          savedAcc?.lastName ||
-                          currentProfile.personalData?.lastName ||
-                          currentProfile.lastName ||
-                          currentProfile.name.split(' ').slice(1).join(' ') ||
-                          'User';
-                        const fullName = `${fName} ${lName}`.trim();
 
-                        setPersonas((prev) =>
-                          prev.map((p) => ({
-                            ...p,
-                            firstName: fName,
-                            lastName: lName,
-                            email: em,
-                            phone: ph,
-                            personalData: {
-                              ...(p.personalData || { phone: ph, email: em, socials: {} }),
+                        // Try restoring cloud snapshot from Firestore first
+                        const cloudSnapshot = await fetchUserSnapshotFromFirestore(fbUser.uid);
+                        if (cloudSnapshot?.personas?.length && cloudSnapshot?.cards?.length) {
+                          setPersonas(cloudSnapshot.personas);
+                          setActivePersonaId(cloudSnapshot.personas[0].id);
+                          setCards(cloudSnapshot.cards);
+                          setActiveCardId(cloudSnapshot.cards[0].id);
+                          if (Array.isArray(cloudSnapshot.contacts)) {
+                            setContacts(cloudSnapshot.contacts);
+                          }
+                          if (cloudSnapshot.subscription) {
+                            setSubscription(normalizeSubscriptionState(cloudSnapshot.subscription));
+                          }
+                        } else {
+                          let savedAcc: any = null;
+                          try {
+                            const raw = localStorage.getItem('youconnect_registered_account_v1');
+                            if (raw) savedAcc = JSON.parse(raw);
+                          } catch {
+                            // ignore
+                          }
+                          const fName =
+                            fbUser.firstName ||
+                            savedAcc?.firstName ||
+                            currentProfile.personalData?.firstName ||
+                            currentProfile.firstName ||
+                            currentProfile.name.split(' ')[0] ||
+                            'Verified';
+                          const lName =
+                            fbUser.lastName ||
+                            savedAcc?.lastName ||
+                            currentProfile.personalData?.lastName ||
+                            currentProfile.lastName ||
+                            currentProfile.name.split(' ').slice(1).join(' ') ||
+                            'User';
+                          const ph =
+                            fbUser.phoneNumber ||
+                            savedAcc?.phone ||
+                            currentProfile.personalData?.phone ||
+                            currentProfile.phone ||
+                            '';
+                          const fullName = `${fName} ${lName}`.trim();
+
+                          setPersonas((prev) =>
+                            prev.map((p) => ({
+                              ...p,
+                              name: fullName,
                               firstName: fName,
                               lastName: lName,
-                              fullName,
                               email: em,
                               phone: ph,
-                            },
-                          }))
-                        );
+                              personalData: {
+                                ...(p.personalData || { phone: ph, email: em, socials: {} }),
+                                firstName: fName,
+                                lastName: lName,
+                                fullName,
+                                email: em,
+                                phone: ph,
+                              },
+                            }))
+                          );
+                        }
+
+                        setAuthPasswordInput('');
                         setIsBetaScratchOnboardingOpen(false);
                       } catch (err: any) {
-                        setBetaFormError(err?.message || 'Sign-In failed.');
+                        setBetaFormError(err?.message || 'Log-In failed.');
                       } finally {
                         setIsAuthSubmitting(false);
                       }
                     }}
                     className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition shadow-lg shadow-indigo-600/30 disabled:opacity-50"
                   >
-                    {isAuthSubmitting ? 'Signing In...' : 'Sign In with KYD Verification'}
+                    {isAuthSubmitting ? 'Logging In...' : 'Log In with Email & Password'}
                   </button>
                 </div>
               </>

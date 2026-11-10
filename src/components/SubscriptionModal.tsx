@@ -85,7 +85,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         setPurchaseError(outcome.message);
       }
     } catch (err: any) {
-      setPurchaseError(err?.message || 'StoreKit / Play Billing purchase could not be completed.');
+      setPurchaseError(err?.message || 'Subscription purchase could not be completed.');
     } finally {
       setIsPurchasingTier(null);
     }
@@ -107,7 +107,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         setPurchaseError(outcome.message);
       }
     } catch (err: any) {
-      setPurchaseError(err?.message || 'Consumable AI Booster purchase could not be completed.');
+      setPurchaseError(err?.message || 'AI Booster Pack purchase could not be completed.');
     } finally {
       setIsBuyingBooster(false);
     }
@@ -124,7 +124,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       setPurchaseToast(outcome.message);
       setTimeout(() => setPurchaseToast(null), 4000);
     } catch (err: any) {
-      setPurchaseError(err?.message || 'Could not restore purchases from App Store / Google Play.');
+      setPurchaseError(err?.message || 'Could not restore previous purchases.');
     } finally {
       setIsRestoring(false);
     }
@@ -393,7 +393,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   <PlusCircle className="h-4 w-4" />
                   <span>
                     {isBuyingBooster
-                      ? 'Processing StoreKit / Play Billing...'
+                      ? 'Processing purchase...'
                       : `Buy AI Booster Pack (+${AI_BOOSTER_PACK_SIZE} Coins · ${AI_BOOSTER_VALIDITY_MONTHS} Mo Validity)`}
                   </span>
                 </button>
@@ -536,7 +536,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                         }`}
                       >
                         {isPurchasingTier === tierKey
-                          ? 'Verifying with RevenueCat...'
+                          ? 'Processing...'
                           : isCurrent
                           ? `✓ Current Active Plan (${spec.name})`
                           : tierKey === 'free'
@@ -609,15 +609,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             )}
           </div>
 
-          {/* Apple App Store (Guideline 3.1.2) & Google Play Billing Subscription Terms Disclosure */}
+          {/* Subscription Terms & Auto-Renewal Disclosure */}
           <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-4 text-[11px] text-slate-400 leading-relaxed space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 text-slate-300 font-semibold">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span>RevenueCat · App Store StoreKit 2 & Google Play Billing Disclosure</span>
-                <span className="rounded bg-slate-900 border border-slate-700 px-2 py-0.5 text-[10px] font-mono text-cyan-300">
-                  {rcConfigured ? 'RevenueCat Live SDK Active' : 'RevenueCat StoreKit / Play Billing Ready'} · Products: {REVENUECAT_PRODUCT_IDS.BASIC_MONTHLY}, {REVENUECAT_PRODUCT_IDS.BUSINESS_MONTHLY}, {REVENUECAT_PRODUCT_IDS.AI_BOOSTER_50}
-                </span>
-              </div>
+              <span>Subscription Terms & Auto-Renewal Information</span>
               <div className="flex items-center gap-3">
                 <a
                   href="/privacy"
@@ -633,19 +628,19 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   rel="noopener noreferrer"
                   className="text-slate-300 hover:text-white underline font-medium"
                 >
-                  Terms of Use (EULA)
+                  Terms of Use
                 </a>
                 <button
                   type="button"
                   onClick={handleRestorePurchases}
                   className="text-indigo-400 hover:text-indigo-300 underline font-medium"
                 >
-                  Restore Previous Purchases
+                  Restore Purchases
                 </button>
               </div>
             </div>
             <p>
-              Payment is charged to your Apple ID or Google Play account at confirmation of purchase via RevenueCat StoreKit 2 / Play Billing (Entitlements: <code className="text-slate-300">{REVENUECAT_ENTITLEMENTS.BASIC}</code>, <code className="text-slate-300">{REVENUECAT_ENTITLEMENTS.BUSINESS}</code>). Subscriptions automatically renew monthly unless auto-renew is turned off at least 24 hours before the end of the current billing period. Your account will be charged for renewal within 24 hours prior to the end of the current period. Included daily/monthly AI Quota Coins are non-cumulative and do not roll over to the next billing month. Separate +50 AI Booster Packs are valid for 3 months (90 days) from purchase. You can manage or cancel subscriptions anytime in your device Account Settings.
+              Payment is charged to your account at confirmation of purchase. Subscriptions automatically renew monthly unless auto-renew is turned off at least 24 hours before the end of the current billing period. Your account will be charged for renewal within 24 hours prior to the end of the current period. Included daily AI Quota Coins are non-cumulative and do not roll over to the next billing month. Separate +50 AI Booster Packs are valid for 3 months (90 days) from purchase. You can manage or cancel subscriptions anytime in your account settings.
             </p>
           </div>
         </div>

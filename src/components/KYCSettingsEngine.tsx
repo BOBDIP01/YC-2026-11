@@ -531,21 +531,21 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-bold text-white">
-                  KYC Document Recognition, Biometric Selfie & Database Traceability
+                  Identity Verification
                 </h2>
                 {isKycVerified ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>Green Verified Tick Active</span>
+                    <span>Verified Badge Active</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                    <span>Unverified — No Green Tick on Card Image Yet</span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                    <span>Not Yet Verified</span>
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                Upload a photo of your official ID document and compare it with a selfie shot. Once verified and registered in the traceability database, your profile photo receives the green verified tick mark on all digital cards.
+                Upload a photo of your official ID document and take a selfie. Once verified, your profile photo displays the green verified badge on all your digital cards.
               </p>
             </div>
           </div>
@@ -673,7 +673,7 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
               />
             </div>
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Traceability Email *</label>
+              <label className="block text-slate-300 font-semibold mb-1">Email Address *</label>
               <input
                 type="email"
                 required
@@ -895,7 +895,7 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
             </div>
           </div>
 
-          {/* Explicit Biometric & AI Vision Processing Consent (GDPR Art. 9 & BIPA Compliance) */}
+          {/* Biometric & Identity Verification Consent */}
           <label className="flex items-start gap-3 p-3.5 rounded-xl bg-slate-950/90 border border-indigo-500/30 cursor-pointer hover:border-indigo-500/60 transition">
             <input
               type="checkbox"
@@ -904,11 +904,11 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
               className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
             />
             <div className="text-[11px] text-slate-300 leading-relaxed">
-              <strong className="text-white">Explicit Biometric & AI Vision Consent (GDPR Art. 9 / BIPA):</strong> I consent to the transient processing of my uploaded identity document and live selfie via Google Gemini AI Vision solely for optical character recognition (OCR) and 1:1 facial geometry comparison. Raw biometric images are never retained on the server or used for model training, and I may revoke my verification record at any time.
+              <strong className="text-white">Identity Verification Consent:</strong> I consent to the processing of my uploaded ID document and selfie solely to verify my identity and activate my verified badge. Uploaded verification photos are never retained permanently or used to train AI models, and I can remove my verification status at any time.
             </div>
           </label>
 
-          {/* STEP 3: SUBMIT TO AI RECOGNITION & TRACEABILITY ENGINE */}
+          {/* STEP 3: SUBMIT VERIFICATION */}
           <div className="pt-2">
             <button
               type="submit"
@@ -918,21 +918,19 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
               {isVerifying ? (
                 <>
                   <RefreshCw className="h-4 w-4 animate-spin text-white" />
-                  <span>{verificationStage || 'Running Document OCR & Selfie Comparison...'}</span>
+                  <span>{verificationStage || 'Verifying Identity...'}</span>
                 </>
               ) : (
                 <>
                   <ShieldCheck className="h-4 w-4" />
-                  <span>
-                    Recognize Document, Compare with Selfie & Register User in Traceability Database
-                  </span>
+                  <span>Verify My Identity</span>
                 </>
               )}
             </button>
           </div>
         </form>
 
-        {/* AI Recognition & Biometric Comparison Results Panel */}
+        {/* Verification Results Panel */}
         {(latestRecord || isKycVerified) && (
           <div className="mt-6 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 p-5 space-y-4 animate-in fade-in duration-200">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-emerald-800/40">
@@ -943,177 +941,38 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-white">
-                      Identity Verified & Registered in Traceability Database
+                      Identity Verified
                     </h3>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
-                      VERIFIED_MATCH
-                    </span>
                   </div>
                   <p className="text-xs text-emerald-200/80 mt-0.5">
-                    {latestRecord?.comparisonSummary ||
-                      profile.kycVerification?.comparisonSummary ||
-                      'Document OCR and 1:1 biometric selfie comparison passed.'}
+                    Your identity has been verified and your green verified badge is active on your digital cards.
                   </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="text-right font-mono">
-                  <div className="text-xs font-bold text-emerald-300">
-                    {latestRecord?.biometricMatchScore ??
-                      profile.kycVerification?.biometricMatchScore ??
-                      98.6}
-                    % Face Match
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    OCR Confidence:{' '}
-                    {latestRecord?.documentConfidenceScore ??
-                      profile.kycVerification?.documentConfidenceScore ??
-                      99.1}
-                    %
-                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Extracted Document Data & Traceability Keys */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-                <div className="text-[10px] font-mono uppercase text-slate-400">Traceability ID</div>
-                <div className="font-mono font-bold text-emerald-400 mt-0.5 truncate">
-                  {latestRecord?.traceabilityId || profile.kycVerification?.traceabilityId}
+                <div className="text-[10px] uppercase text-slate-400">Verified Name</div>
+                <div className="font-semibold text-white mt-0.5 truncate">
+                  {latestRecord?.extractedFields?.fullName || profile.name}
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-                <div className="text-[10px] font-mono uppercase text-slate-400">Document & No.</div>
-                <div className="font-mono font-semibold text-white mt-0.5 truncate">
+                <div className="text-[10px] uppercase text-slate-400">Document</div>
+                <div className="font-semibold text-white mt-0.5 truncate">
                   {latestRecord?.documentType || profile.kycVerification?.documentType} ·{' '}
                   {latestRecord?.documentNumberMasked ||
                     profile.kycVerification?.documentNumberMasked}
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-                <div className="text-[10px] font-mono uppercase text-slate-400">
-                  Extracted Legal Name
-                </div>
-                <div className="font-semibold text-white mt-0.5 truncate">
-                  {latestRecord?.extractedFields?.fullName || profile.name}
-                </div>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-                <div className="text-[10px] font-mono uppercase text-slate-400">
-                  Cryptographic Audit Hash
-                </div>
-                <div
-                  className="font-mono text-[11px] text-cyan-300 mt-0.5 truncate"
-                  title={latestRecord?.traceabilityHash || profile.kycVerification?.traceabilityHash}
-                >
-                  {latestRecord?.traceabilityHash || profile.kycVerification?.traceabilityHash}
+                <div className="text-[10px] uppercase text-slate-400">Status</div>
+                <div className="font-bold text-emerald-400 mt-0.5 truncate">
+                  Active Verified Badge
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* 2. KYC Traceability Database Registry Table */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
-          <div className="flex items-center gap-2.5">
-            <Database className="h-5 w-5 text-cyan-400" />
-            <div>
-              <h3 className="text-sm font-bold text-white">
-                KYC Traceability Database Ledger ({dbRecords.length} Registered)
-              </h3>
-              <p className="text-xs text-slate-400">
-                Server-side audit database storing verified user identity registrations, document OCR hashes, and selfie biometric comparison scores.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={fetchTraceabilityRecords}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition self-start sm:self-auto"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoadingDb ? 'animate-spin' : ''}`} />
-            <span>Refresh Database</span>
-          </button>
-        </div>
-
-        {dbRecords.length === 0 ? (
-          <div className="p-8 rounded-xl border border-dashed border-slate-800 text-center space-y-2">
-            <Database className="h-7 w-7 text-slate-600 mx-auto" />
-            <div className="text-xs font-semibold text-slate-300">
-              No KYC Traceability Records Registered Yet
-            </div>
-            <p className="text-[11px] text-slate-500 max-w-md mx-auto">
-              Upload an identity document and capture/select a selfie shot above, then click "Recognize Document, Compare with Selfie & Register User" to log your verifiable record.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {dbRecords.map((rec) => (
-              <div
-                key={rec.traceabilityId}
-                className="rounded-xl border border-slate-800 bg-slate-950/90 p-4 space-y-3"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="h-6 w-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center">
-                      <Check className="h-3.5 w-3.5 stroke-[3]" />
-                    </span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-white">{rec.fullName}</span>
-                        <span className="text-[11px] font-mono text-indigo-300">{rec.email}</span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/60">
-                          {rec.traceabilityId}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                        {rec.documentType} ({rec.issuingCountry}) · Doc #{rec.documentNumberMasked} ·{' '}
-                        {new Date(rec.registeredAt).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-800/50 text-cyan-300">
-                      Selfie Match: {rec.biometricMatchScore}%
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadCertificate(rec)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-200 transition"
-                      title="Download JSON Traceability Certificate"
-                    >
-                      <Download className="h-3 w-3" />
-                      <span>Certificate</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Audit Trail Steps */}
-                {rec.auditTrail && rec.auditTrail.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-2 border-t border-slate-800/80">
-                    {rec.auditTrail.map((stepItem, i) => (
-                      <div
-                        key={i}
-                        className="p-2 rounded-lg bg-slate-900/70 border border-slate-800/70 text-[10px]"
-                      >
-                        <div className="font-semibold text-emerald-400 flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{stepItem.step}</span>
-                        </div>
-                        <div className="text-slate-400 mt-0.5 truncate" title={stepItem.detail}>
-                          {stepItem.detail}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
           </div>
         )}
       </div>

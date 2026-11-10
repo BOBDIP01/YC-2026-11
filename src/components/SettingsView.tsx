@@ -110,7 +110,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isRadarGuideModalOpen, setIsRadarGuideModalOpen] = useState(false);
 
   // Sub-tabs for Compliance & Privacy sub-menu
-  const [complianceSubTab, setComplianceSubTab] = useState<'audit' | 'sovereignty' | 'privacy' | 'terms'>('audit');
+  const [complianceSubTab, setComplianceSubTab] = useState<'sovereignty' | 'privacy' | 'terms'>('sovereignty');
   const [isPurgeConfirmOpen, setIsPurgeConfirmOpen] = useState(false);
   const [purgeAuditToken, setPurgeAuditToken] = useState<string | null>(null);
   const [kycProcessing, setKycProcessing] = useState(false);
@@ -474,62 +474,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }, 1200);
   };
 
-  // Store Review Audit Items
-  const appleAuditItems = [
-    {
-      id: 'apple-3-1-1',
-      guideline: 'Guideline 3.1.1 & 3.1.2 — RevenueCat StoreKit 2 In-App Purchases',
-      status: 'passed',
-      description: 'Digital subscriptions (Basic $12/mo, Business $29/mo) and AI Quota Boosters ($14.99) must use Apple In-App Purchase with Restore Purchases and EULA/Privacy links.',
-      implementation: 'Wired to @revenuecat/purchases-capacitor (StoreKit 2), /api/webhooks/revenuecat, Restore Purchases handler, and clickable /privacy & /terms links.',
-    },
-    {
-      id: 'apple-4-8',
-      guideline: 'Guideline 4.8 — Sign in with Apple & Firebase Auth',
-      status: 'passed',
-      description: 'Apps offering third-party or social login must include Sign in with Apple as an equivalent privacy-preserving authentication option.',
-      implementation: 'Integrated Sign in with Apple (OAuthProvider apple.com), Google Sign-In, and Email/Password via Firebase Authentication.',
-    },
-    {
-      id: 'apple-5-1-1-v',
-      guideline: 'Guideline 5.1.1(v) — In-App Account & Cloud Data Deletion',
-      status: 'passed',
-      description: 'Apps supporting account creation must offer a prominent mechanism to permanently delete Firebase Auth accounts, Firestore documents, Storage media, and server records.',
-      implementation: 'Implemented via deleteFirebaseAccountAndCloudData() + /api/privacy/purge + standalone /delete-account web portal.',
-    },
-    {
-      id: 'apple-itms-91053',
-      guideline: 'ITMS-91053 — iOS Privacy Manifest (PrivacyInfo.xcprivacy)',
-      status: 'passed',
-      description: 'Mandatory declaration of Required Reason APIs (UserDefaults CA92.1, FileTimestamp C617.1, SystemBootTime 35F9.1, DiskSpace E174.1) and CoreNFC entitlements.',
-      implementation: 'Bundled ios/App/App/PrivacyInfo.xcprivacy and ios/App/App/App.entitlements (CoreNFC, Associated Domains, Sign in with Apple).',
-    },
-  ];
-
-  const googleAuditItems = [
-    {
-      id: 'google-play-billing',
-      policy: 'Google Play Payments Policy — Play Billing v7 via RevenueCat',
-      status: 'passed',
-      description: 'All digital subscriptions and consumable AI Quota Coin packs on Android must be billed via Google Play Billing Library v7+.',
-      implementation: 'Integrated via RevenueCat Google Play Billing SDK (youconnect_basic_monthly, youconnect_business_monthly, youconnect_ai_booster_50).',
-    },
-    {
-      id: 'google-user-data',
-      policy: 'Google Play Account Deletion Policy (In-App + Web URL)',
-      status: 'passed',
-      description: 'Requires both an in-app deletion path and an external web link (/delete-account) listed in Play Console Data Safety.',
-      implementation: 'Full recursive purge removes Firebase Auth user, Firestore users/{uid}, Storage media, and server records both in-app and at /delete-account.',
-    },
-    {
-      id: 'google-app-links',
-      policy: 'Android App Links & Hardware Permission Gating (NFC / Camera)',
-      status: 'passed',
-      description: 'Digital Asset Links verification (/.well-known/assetlinks.json) and runtime permission checks for NFC and Camera.',
-      implementation: 'Served at /.well-known/assetlinks.json with Native Capacitor NFC plugin bridge and graceful fallback.',
-    },
-  ];
-
   const isKycVerified = Boolean(
     profile.isVerified &&
       profile.kycVerification?.isCompleted &&
@@ -542,25 +486,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       id: 'account',
       label: 'Account & Master Data',
       icon: <User className="h-4 w-4" />,
-      desc: 'Legal identity, contact details & emergency info',
+      desc: 'Personal details, contact info & emergency contacts',
     },
     {
       id: 'kyc',
-      label: 'KYC & Identity Verification',
+      label: 'Identity Verification',
       icon: <ShieldCheck className="h-4 w-4" />,
-      desc: 'Upload ID document, selfie comparison & traceability DB',
+      desc: 'Verify your identity with an ID document & selfie',
     },
     {
       id: 'privacy',
-      label: 'Compliance & Privacy',
+      label: 'Privacy & Legal',
       icon: <Scale className="h-4 w-4" />,
-      desc: 'GDPR, CCPA, Store audits & legal terms',
+      desc: 'Data controls, privacy policy & terms of service',
     },
     {
       id: 'storage',
-      label: 'Storage & Data',
+      label: 'Storage & Backups',
       icon: <HardDrive className="h-4 w-4" />,
-      desc: 'LocalStorage usage, JSON backups & cache',
+      desc: 'Storage usage, data backups & temporary cache',
     },
     {
       id: 'subscription',
@@ -608,7 +552,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               className="h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 hover:bg-emerald-900/60 transition"
             >
               <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-              <span>KYC Verified ({profile.kycVerification?.traceabilityId})</span>
+              <span>Identity Verified</span>
             </button>
           ) : (
             <button
@@ -617,7 +561,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               className="h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 text-amber-300 bg-amber-950/60 border border-amber-800/60 hover:bg-amber-900/60 transition"
             >
               <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-              <span>Verify Identity (KYC)</span>
+              <span>Verify Identity</span>
             </button>
           )}
           {onOpenAuthModal && (
@@ -627,7 +571,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               className="h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 text-cyan-300 bg-cyan-950/60 border border-cyan-700/60 hover:bg-cyan-900/60 transition"
             >
               <User className="h-3.5 w-3.5 shrink-0" />
-              <span>Sign In / Sign On</span>
+              <span>Log In / Sign Up</span>
             </button>
           )}
           <span className="h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 text-indigo-300 bg-indigo-950/60 border border-indigo-800/60">
@@ -796,11 +740,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         {isKycVerified ? (
                           <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/60">
                             <CheckCircle2 className="h-3 w-3" />
-                            Verified Identity ({profile.kycVerification?.traceabilityId})
+                            Verified Identity
                           </span>
                         ) : (
                           <span className="text-[11px] text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/60">
-                            Unverified — Upload ID Document & Selfie in KYC Settings
+                            Unverified — Upload ID & Selfie to get your Verified Badge
                           </span>
                         )}
                       </div>
@@ -819,16 +763,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition"
                     >
                       <ShieldCheck className="h-3.5 w-3.5" />
-                      <span>Upload ID & Selfie (KYC Setup)</span>
+                      <span>Verify Identity</span>
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setActiveSubMenu('kyc')}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-700/60 text-xs font-mono text-emerald-300 transition"
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-700/60 text-xs font-semibold text-emerald-300 transition"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                      <span>View KYC Traceability Record</span>
+                      <span>View Verification Status</span>
                     </button>
                   )}
                 </div>
@@ -1130,39 +1074,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             />
           )}
 
-          {/* 2. COMPLIANCE & PRIVACY (Sub-menu of Settings) */}
+          {/* 2. PRIVACY & LEGAL (Sub-menu of Settings) */}
           {activeSubMenu === 'privacy' && (
             <div className="space-y-6">
-              {/* Compliance Header Banner */}
+              {/* Privacy Header Banner */}
               <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
                   <div>
                     <h2 className="text-base font-bold text-white flex items-center gap-2">
                       <ShieldCheck className="h-5 w-5 text-indigo-400" />
-                      Compliance & Privacy Center
+                      Privacy & Legal Center
                     </h2>
                     <p className="text-xs text-slate-400 mt-1">
-                      Audited against Apple App Store Review Guidelines, Google Play Policies, GDPR Article 17, and CCPA protocols.
+                      Manage your data privacy preferences, download your archive, delete your account, or read our legal policies.
                     </p>
                   </div>
 
                   {/* Sub-tabs */}
                   <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 p-1 rounded-lg text-xs font-medium">
                     <button
-                      onClick={() => setComplianceSubTab('audit')}
-                      className={`px-3 py-1.5 rounded-md transition ${
-                        complianceSubTab === 'audit' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Store Audit
-                    </button>
-                    <button
                       onClick={() => setComplianceSubTab('sovereignty')}
                       className={`px-3 py-1.5 rounded-md transition ${
                         complianceSubTab === 'sovereignty' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      Data Sovereignty
+                      Data & Privacy
                     </button>
                     <button
                       onClick={() => setComplianceSubTab('privacy')}
@@ -1178,7 +1114,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         complianceSubTab === 'terms' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      Terms & EULA
+                      Terms of Use
                     </button>
                   </div>
                 </div>
@@ -1187,84 +1123,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <div className="rounded-xl border border-rose-800/80 bg-rose-950/40 p-4 text-xs text-rose-200 space-y-1">
                     <div className="font-bold flex items-center gap-1.5 text-rose-300">
                       <CheckCircle2 className="h-4 w-4" />
-                      <span>GDPR Article 17 Recursive Purge Executed</span>
+                      <span>Account & Data Deleted</span>
                     </div>
-                    <p>All local caches, virtual cards, contacts, and persona memories have been permanently unlinked and destroyed.</p>
-                    <div className="font-mono text-[11px] text-rose-400">Cryptographic Receipt: {purgeAuditToken}</div>
+                    <p>All your profiles, digital cards, and contacts have been permanently removed.</p>
                   </div>
                 )}
 
-                {/* Sub-Tab 1: Store Publication Audit */}
-                {complianceSubTab === 'audit' && (
-                  <div className="space-y-6">
-                    {/* Apple App Store Section */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm font-bold text-white">
-                          <Smartphone className="h-4 w-4 text-indigo-400" />
-                          <span>Apple App Store Guidelines Audit</span>
-                        </div>
-                        <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded">
-                          100% Compliant
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {appleAuditItems.map((item) => (
-                          <div key={item.id} className="rounded-lg bg-slate-950/80 border border-slate-800 p-3.5 space-y-1.5 text-xs">
-                            <div className="font-bold text-white flex items-center justify-between">
-                              <span>{item.guideline}</span>
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                            </div>
-                            <p className="text-slate-400 text-[11px]">{item.description}</p>
-                            <div className="text-[11px] text-indigo-300 font-mono bg-slate-900 p-2 rounded border border-slate-800/80">
-                              {item.implementation}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Google Play Section */}
-                    <div className="space-y-3 pt-3 border-t border-slate-800">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm font-bold text-white">
-                          <Smartphone className="h-4 w-4 text-emerald-400" />
-                          <span>Google Play Developer Policies</span>
-                        </div>
-                        <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded">
-                          Passed
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {googleAuditItems.map((item) => (
-                          <div key={item.id} className="rounded-lg bg-slate-950/80 border border-slate-800 p-3.5 space-y-1.5 text-xs">
-                            <div className="font-bold text-white flex items-center justify-between">
-                              <span>{item.policy}</span>
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                            </div>
-                            <p className="text-slate-400 text-[11px]">{item.description}</p>
-                            <div className="text-[11px] text-emerald-300 font-mono bg-slate-900 p-2 rounded border border-slate-800/80">
-                              {item.implementation}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Sub-Tab 2: Data Sovereignty */}
+                {/* Sub-Tab: Data & Privacy */}
                 {complianceSubTab === 'sovereignty' && (
                   <div className="space-y-6">
-                    {/* GDPR Article 20 Export */}
+                    {/* Data Export */}
                     <div className="rounded-lg bg-slate-950/80 border border-slate-800 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
                         <h4 className="text-sm font-bold text-white flex items-center gap-2">
                           <Download className="h-4 w-4 text-indigo-400" />
-                          GDPR Article 20: Data Portability Export
+                          Download Your Data
                         </h4>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          Download a signed, structured JSON archive containing your master profile, cards, and CRM contacts.
+                          Download a copy of your profile, digital cards, and contacts.
                         </p>
                       </div>
                       <button
@@ -1272,18 +1148,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition whitespace-nowrap shadow-sm"
                       >
                         <Download className="h-4 w-4" />
-                        <span>Export Data Archive</span>
+                        <span>Export Data</span>
                       </button>
                     </div>
 
-                    {/* CCPA Toggle */}
+                    {/* Do Not Sell Toggle */}
                     <div className="rounded-lg bg-slate-950/80 border border-slate-800 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
                         <h4 className="text-sm font-bold text-white">
-                          CCPA: Do Not Sell or Share My Personal Information
+                          Do Not Sell or Share My Personal Information
                         </h4>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          Enforce California Consumer Privacy Act opt-out flags and broadcast Global Privacy Control (GPC) headers.
+                          Opt out of data sharing and third-party tracking.
                         </p>
                       </div>
                       <button
@@ -1299,14 +1175,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       </button>
                     </div>
 
-                    {/* GDPR Article 17 Erasure */}
+                    {/* Account Deletion */}
                     <div className="rounded-lg bg-rose-950/20 border border-rose-900/60 p-5 space-y-3">
                       <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
                         <AlertTriangle className="h-4 w-4" />
-                        <span>GDPR Article 17: Right to Erasure ("Forgotten")</span>
+                        <span>Delete Account & Personal Data</span>
                       </div>
                       <p className="text-xs text-rose-200/80">
-                        Irreversibly delete your account, persona identities, digital business cards, and CRM contacts from this device. A cryptographic deletion receipt will be generated.
+                        Permanently delete your account, profiles, digital business cards, and contacts.
                       </p>
                       {!isPurgeConfirmOpen ? (
                         <button
@@ -1314,19 +1190,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white transition shadow-sm"
                         >
                           <Trash2 className="h-4 w-4" />
-                          <span>Request Immediate Recursive Purge</span>
+                          <span>Delete Account & Data</span>
                         </button>
                       ) : (
                         <div className="p-4 rounded-lg bg-rose-950/60 border border-rose-800 space-y-3">
                           <p className="text-xs text-white font-medium">
-                            Are you certain? This action cannot be reversed.
+                            Are you sure you want to permanently delete your account and all data? This action cannot be undone.
                           </p>
                           <div className="flex items-center gap-2">
                             <button
                               onClick={handleConfirmErasure}
                               className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white transition"
                             >
-                              Yes, Permanently Purge Everything
+                              Yes, Permanently Delete Everything
                             </button>
                             <button
                               onClick={() => setIsPurgeConfirmOpen(false)}
@@ -1341,58 +1217,58 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
                 )}
 
-                {/* Sub-Tab 3: Privacy Policy */}
+                {/* Sub-Tab: Privacy Policy */}
                 {complianceSubTab === 'privacy' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                      <h3 className="text-sm font-bold text-white">YouConnect Privacy Policy (v3.5)</h3>
+                      <h3 className="text-sm font-bold text-white">YouConnect Privacy Policy</h3>
                       <button
-                        onClick={() => handleCopyText('YouConnect Privacy Policy: Local-first storage, Selective Sharing sanitization, transient Google Gemini AI processing, and GDPR Article 17 local+server erasure.', 'privacy')}
+                        onClick={() => handleCopyText('https://youconnect.app/privacy', 'privacy')}
                         className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
                       >
                         {copiedSection === 'privacy' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        <span>{copiedSection === 'privacy' ? 'Copied' : 'Copy Legal Text'}</span>
+                        <span>{copiedSection === 'privacy' ? 'Copied' : 'Copy Link'}</span>
                       </button>
                     </div>
                     <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-3 leading-relaxed max-h-96 overflow-y-auto">
                       <p>
-                        <strong>1. Architecture, Local Sovereignty & Selective Sharing:</strong> Your master contacts, vCard data, and custom circles are stored on your local device. When publishing a card link (/p/:slug), client- and server-side Selective Sharing filters strip all unshared private fields before transmission. We do not sell, rent, or monetize your contact records.
+                        <strong>1. Privacy & Selective Sharing:</strong> Your profile details, digital cards, and contacts are protected with selective sharing controls. When you share a card link, only the fields you explicitly enable are visible to recipients. We never sell or rent your contact list.
                       </p>
                       <p>
-                        <strong>2. Proximity, WebSocket P2P Radar & Hardware Sensors:</strong> When activating P2P Radar or NFC hardware scanning, ephemeral WebSocket room signaling and radio transceivers operate solely during the user-initiated scanning session. No continuous background GPS location tracking is performed.
+                        <strong>2. Proximity & P2P Radar:</strong> P2P Radar and NFC card sharing operate only while you actively have a session open. No background location tracking is performed.
                       </p>
                       <p>
-                        <strong>3. Transient AI & Biometric KYC Processing:</strong> Optional AI features (AI Bio Strategist, Studio Headshots, 3D Avatars, Cover Banners, CRM Enrichment, and KYC Document/Selfie Verification) transmit inputs over TLS to our server proxy for transient processing via Google Gemini APIs. Raw identity documents and selfie images are never retained on the server or used for model training; only a masked cryptographic KYC traceability hash is stored and can be purged anytime via GDPR Article 17.
+                        <strong>3. AI Studio & Identity Verification:</strong> Optional AI features (headshots, 3D avatars, banners, bio writing, and identity verification) process your inputs securely to generate your requested content or verify your badge. Uploaded verification photos are never used to train third-party AI models.
                       </p>
                       <p>
-                        <strong>4. Regulatory Inquiries:</strong> Contact our designated Data Protection Officer at <code className="text-indigo-300">dpo@youconnect.app</code>.
+                        <strong>4. Contact Us:</strong> For privacy questions or requests, contact <code className="text-indigo-300">privacy@youconnect.app</code>.
                       </p>
                     </div>
                   </div>
                 )}
 
-                {/* Sub-Tab 4: Terms & EULA */}
+                {/* Sub-Tab: Terms of Use */}
                 {complianceSubTab === 'terms' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                      <h3 className="text-sm font-bold text-white">Terms of Service & EULA</h3>
+                      <h3 className="text-sm font-bold text-white">Terms of Use</h3>
                       <button
-                        onClick={() => handleCopyText('YouConnect End User License Agreement: Standard terms of enterprise business networking, StoreKit/Play Billing subscriptions, and nominative fair use.', 'terms')}
+                        onClick={() => handleCopyText('https://youconnect.app/terms', 'terms')}
                         className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
                       >
                         {copiedSection === 'terms' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        <span>{copiedSection === 'terms' ? 'Copied' : 'Copy EULA'}</span>
+                        <span>{copiedSection === 'terms' ? 'Copied' : 'Copy Link'}</span>
                       </button>
                     </div>
                     <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-3 leading-relaxed max-h-96 overflow-y-auto">
                       <p>
-                        <strong>1. Permitted Use & Subscriptions:</strong> YouConnect is licensed for professional networking, event peer discovery, and digital card exchanges. Paid tiers (Basic & Business) renew monthly via Apple App Store / Google Play Billing unless cancelled at least 24 hours before renewal. Included AI Quota Coins are non-cumulative; +50 AI Booster Packs are valid for 3 months (90 days).
+                        <strong>1. Subscriptions & AI Coins:</strong> Paid plans (Basic & Business) renew monthly unless cancelled at least 24 hours before the end of the billing period. Daily included AI Quota Coins are non-cumulative and do not roll over to the next month; +50 AI Booster Packs remain valid for 3 months (90 days) from purchase.
                       </p>
                       <p>
-                        <strong>2. Nominative Fair Use & Trademarks:</strong> Third-party social platform names and icons (LinkedIn, X, Instagram, WhatsApp, GitHub, YouTube, etc.) are trademarks of their respective owners and are used strictly under nominative fair use to identify user-designated external profile URLs.
+                        <strong>2. Trademarks:</strong> Third-party social network names and icons (LinkedIn, X, Instagram, WhatsApp, GitHub, YouTube, etc.) are trademarks of their respective owners and are used solely to link to your designated social profiles.
                       </p>
                       <p>
-                        <strong>3. Hardware Warranty Disclaimer:</strong> NFC tag writing relies on device antenna alignment, OS support (Android Web NFC / iOS CoreNFC & Universal Links), and NDEF capability.
+                        <strong>3. NFC & Sharing:</strong> NFC tag writing and reading depend on compatible device hardware and tag support.
                       </p>
                     </div>
                   </div>

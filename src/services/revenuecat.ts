@@ -101,15 +101,30 @@ let rcInitializedForUser: string | null = null;
  */
 export function mapCustomerInfoToTier(customerInfo: any): SubscriptionTier {
   const active = customerInfo?.entitlements?.active || {};
+  const subs: string[] = Array.isArray(customerInfo?.activeSubscriptions)
+    ? customerInfo.activeSubscriptions
+    : [];
   if (
     active[REVENUECAT_ENTITLEMENTS.BUSINESS] ||
-    customerInfo?.activeSubscriptions?.includes(REVENUECAT_PRODUCT_IDS.BUSINESS_MONTHLY)
+    active['YouConnect Ultra'] ||
+    subs.some(
+      (s) =>
+        s.startsWith(REVENUECAT_PRODUCT_IDS.BUSINESS_MONTHLY) ||
+        s === 'Annual_Tier_2' ||
+        s.startsWith('ultra_y_1')
+    )
   ) {
     return 'business';
   }
   if (
     active[REVENUECAT_ENTITLEMENTS.BASIC] ||
-    customerInfo?.activeSubscriptions?.includes(REVENUECAT_PRODUCT_IDS.BASIC_MONTHLY)
+    active['YouConnect Pro'] ||
+    subs.some(
+      (s) =>
+        s.startsWith(REVENUECAT_PRODUCT_IDS.BASIC_MONTHLY) ||
+        s === 'Annual_Tier_1' ||
+        s.startsWith('plus_y_1')
+    )
   ) {
     return 'basic';
   }
@@ -344,13 +359,7 @@ export async function purchaseSubscriptionTierWithRevenueCat(
           success: true,
           tier: verifiedTier,
           transactionId: txId,
-          message: `RevenueCat (${
-            initInfo.provider === 'apple_storekit2' ? 'StoreKit 2' : 'Google Play Billing'
-          }) verified entitlement "${
-            verifiedTier === 'business'
-              ? REVENUECAT_ENTITLEMENTS.BUSINESS
-              : REVENUECAT_ENTITLEMENTS.BASIC
-          }"!`,
+          message: `Your ${verifiedTier === 'business' ? 'Business' : 'Basic'} plan is now active!`,
         };
       }
     } catch (err: any) {
@@ -358,10 +367,10 @@ export async function purchaseSubscriptionTierWithRevenueCat(
         return {
           success: false,
           userCancelled: true,
-          message: 'Purchase cancelled by user.',
+          message: 'Purchase cancelled.',
         };
       }
-      throw new Error(err?.message || 'StoreKit / Play Billing transaction failed.');
+      throw new Error(err?.message || 'Subscription transaction could not be completed.');
     }
   }
 
@@ -378,7 +387,7 @@ export async function purchaseSubscriptionTierWithRevenueCat(
           success: true,
           tier: verifiedTier,
           transactionId: `rc_web_${Date.now()}`,
-          message: `RevenueCat Web Billing confirmed ${targetTier.toUpperCase()} subscription!`,
+          message: `Your ${targetTier === 'business' ? 'Business' : 'Basic'} subscription is now active!`,
         };
       }
     } catch (err: any) {
@@ -406,11 +415,7 @@ export async function purchaseSubscriptionTierWithRevenueCat(
     success: true,
     tier: targetTier,
     transactionId: txId,
-    message: `RevenueCat Sandbox Receipt (${txId}) verified · Entitlement "${
-      targetTier === 'business'
-        ? REVENUECAT_ENTITLEMENTS.BUSINESS
-        : REVENUECAT_ENTITLEMENTS.BASIC
-    }" active!`,
+    message: `Your ${targetTier === 'business' ? 'Business' : 'Basic'} plan is now active!`,
   };
 }
 
@@ -445,7 +450,7 @@ export async function purchaseAiBoosterWithRevenueCat(
           success: true,
           boosterCoinsAdded: coinsToAdd,
           transactionId: txId,
-          message: `StoreKit 2 / Play Billing Consumable (${productId}) verified · +${coinsToAdd} AI Quota Coins added (valid 3 months)!`,
+          message: `+${coinsToAdd} AI Quota Coins added to your balance (valid for 3 months)!`,
         };
       }
     } catch (err: any) {
@@ -456,7 +461,7 @@ export async function purchaseAiBoosterWithRevenueCat(
           message: 'Booster pack purchase cancelled.',
         };
       }
-      throw new Error(err?.message || 'Consumable purchase failed.');
+      throw new Error(err?.message || 'Purchase could not be completed.');
     }
   }
 
@@ -473,7 +478,7 @@ export async function purchaseAiBoosterWithRevenueCat(
     success: true,
     boosterCoinsAdded: coinsToAdd,
     transactionId: txId,
-    message: `RevenueCat Consumable Receipt (${txId}) verified · +${coinsToAdd} AI Quota Coins credited (valid 3 months)!`,
+    message: `+${coinsToAdd} AI Quota Coins added to your balance (valid for 3 months)!`,
   };
 }
 
@@ -494,10 +499,10 @@ export async function restorePurchasesWithRevenueCat(
       return {
         success: true,
         tier: restoredTier,
-        message: `App Store / Google Play receipts restored via RevenueCat: ${restoredTier.toUpperCase()} tier verified.`,
+        message: `Your purchases have been restored (${restoredTier.toUpperCase()} plan active).`,
       };
     } catch (err: any) {
-      throw new Error(err?.message || 'Failed to restore purchases from store.');
+      throw new Error(err?.message || 'Failed to restore purchases.');
     }
   }
 
@@ -512,9 +517,7 @@ export async function restorePurchasesWithRevenueCat(
         return {
           success: true,
           tier: data.tier as SubscriptionTier,
-          message: `RevenueCat Entitlements Restored (${initInfo.appUserId}): ${String(
-            data.tier
-          ).toUpperCase()} Plan & ${data.boosterCoins || 0} Booster Coins synchronized.`,
+          message: `Your purchases have been restored (${String(data.tier).toUpperCase()} plan active).`,
         };
       }
     }
@@ -525,7 +528,7 @@ export async function restorePurchasesWithRevenueCat(
   return {
     success: true,
     tier: currentLocalTier,
-    message: `RevenueCat CustomerInfo synchronized (${initInfo.appUserId}): ${currentLocalTier.toUpperCase()} Tier verified.`,
+    message: `Your subscription status is up to date (${currentLocalTier.toUpperCase()} plan).`,
   };
 }
 

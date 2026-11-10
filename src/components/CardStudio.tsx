@@ -236,19 +236,22 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   });
 
   const handleRecallMobileSection = (sectionKey?: keyof typeof openAccordions) => {
-    setIsMobileEditorOpen(true);
-    if (sectionKey) {
-      setOpenAccordions({
-        personal: sectionKey === 'personal',
-        work: sectionKey === 'work',
-        beyond: sectionKey === 'beyond',
-        socials: sectionKey === 'socials',
-        portrait: sectionKey === 'portrait',
-        background: sectionKey === 'background',
-        theme: sectionKey === 'theme',
-        sharing: sectionKey === 'sharing',
-      });
+    if (sectionKey && isMobileEditorOpen && openAccordions[sectionKey]) {
+      setIsMobileEditorOpen(false);
+      return;
     }
+    const targetKey = sectionKey || 'personal';
+    setIsMobileEditorOpen(true);
+    setOpenAccordions({
+      personal: targetKey === 'personal',
+      work: targetKey === 'work',
+      beyond: targetKey === 'beyond',
+      socials: targetKey === 'socials',
+      portrait: targetKey === 'portrait',
+      background: targetKey === 'background',
+      theme: targetKey === 'theme',
+      sharing: targetKey === 'sharing',
+    });
     window.setTimeout(() => {
       mobileEditorSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 80);
@@ -263,7 +266,11 @@ export const CardStudio: React.FC<CardStudioProps> = ({
       if (key === 'background' && !nextOpen) {
         setIsBackgroundVaultOpen(false);
       }
-      return { ...prev, [key]: nextOpen };
+      const updated = { ...prev, [key]: nextOpen };
+      if (!Object.values(updated).some(Boolean)) {
+        setIsMobileEditorOpen(false);
+      }
+      return updated;
     });
   };
 
@@ -1455,20 +1462,19 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                   <span>Fill & Customize Card Data</span>
                 </span>
                 <p className="text-[11px] text-slate-400 truncate">
-                  Tap a menu below to edit your card details
+                  Tap an icon below to open that section (tap again to close)
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsMobileEditorOpen((prev) => !prev)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
-                  isMobileEditorOpen
-                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm'
-                }`}
-              >
-                {isMobileEditorOpen ? 'Hide Menus' : 'All Menus'}
-              </button>
+              {isMobileEditorOpen && (
+                <button
+                  type="button"
+                  onClick={() => setIsMobileEditorOpen(false)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition shrink-0 flex items-center gap-1"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span>Close</span>
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-4 gap-1.5">
@@ -1698,15 +1704,15 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           ref={mobileEditorSectionRef}
           className={`${isMobileEditorOpen ? 'block' : 'hidden lg:block'} lg:col-span-7 space-y-3 scroll-mt-20`}
         >
-          {/* Card Hub Single-Level Workspace Header */}
-          <div className="flex items-center justify-between gap-2 px-1 pb-1">
+          {/* Card Hub Single-Level Workspace Header (Desktop only; Mobile uses the Horizontal Icon Menu) */}
+          <div className="hidden lg:flex items-center justify-between gap-2 px-1 pb-1">
             <div>
               <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
                 <Sliders className="h-3.5 w-3.5 text-indigo-400" />
                 <span>Card Hub Sections</span>
               </h2>
               <p className="text-[11px] text-slate-400">
-                Tap any section below to expand or collapse. Changes update your card live above.
+                Tap any section below to expand or collapse. Changes update your card live.
               </p>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
@@ -1717,21 +1723,13 @@ export const CardStudio: React.FC<CardStudioProps> = ({
               >
                 {areAllAccordionsOpen ? 'Collapse All' : 'Expand All'}
               </button>
-              <button
-                type="button"
-                onClick={() => setIsMobileEditorOpen(false)}
-                className="lg:hidden px-2.5 py-1 rounded-lg border border-indigo-500/40 bg-indigo-500/15 hover:bg-indigo-500/25 text-[11px] font-semibold text-indigo-300 transition flex items-center gap-1"
-              >
-                <X className="h-3 w-3" />
-                <span>Hide Menus</span>
-              </button>
             </div>
           </div>
 
           {/* ================================================================= */}
           {/* ACCORDION 1: PERSONAL IDENTITY & COORDINATES                      */}
           {/* ================================================================= */}
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition">
+          <div className={`${openAccordions.personal ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
               type="button"
               onClick={() => toggleAccordion('personal')}
@@ -1788,7 +1786,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           {/* ================================================================= */}
           {/* ACCORDION 2: WORK & CORPORATE CREDENTIALS                         */}
           {/* ================================================================= */}
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition">
+          <div className={`${openAccordions.work ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
               type="button"
               onClick={() => toggleAccordion('work')}
@@ -1845,7 +1843,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           {/* ================================================================= */}
           {/* ACCORDION 3: PASSIONS, EDUCATION & ARTIST PORTFOLIO               */}
           {/* ================================================================= */}
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition">
+          <div className={`${openAccordions.beyond ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
               type="button"
               onClick={() => toggleAccordion('beyond')}
@@ -1902,7 +1900,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           {/* ================================================================= */}
           {/* ACCORDION 4: SOCIAL & MESSAGING NETWORKS                          */}
           {/* ================================================================= */}
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition">
+          <div className={`${openAccordions.socials ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
               type="button"
               onClick={() => toggleAccordion('socials')}
@@ -2126,7 +2124,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
             return (
               <>
                 {/* ACCORDION 5: PORTRAIT & AI AVATAR STUDIO */}
-                <div className="rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition">
+                <div className={`${openAccordions.portrait ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
                   <button
                     type="button"
                     onClick={() => toggleAccordion('portrait')}
@@ -2582,7 +2580,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                 </div>
 
                 {/* ACCORDION 6: CARD BACKGROUND & SCENIC STUDIO */}
-                <div className="rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition">
+                <div className={`${openAccordions.background ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
                   <button
                     type="button"
                     onClick={() => toggleAccordion('background')}
@@ -3004,7 +3002,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           {/* ================================================================= */}
           {/* ACCORDION 7: CARD THEME, LAYOUT & BRAND LOGO                      */}
           {/* ================================================================= */}
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition">
+          <div className={`${openAccordions.theme ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
               type="button"
               onClick={() => toggleAccordion('theme')}
@@ -4615,7 +4613,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
             ).length;
 
             return (
-              <div className="rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition">
+              <div className={`${openAccordions.sharing ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
                 <button
                   type="button"
                   onClick={() => toggleAccordion('sharing')}

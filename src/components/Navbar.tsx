@@ -26,6 +26,7 @@ interface NavbarProps {
   subscription: SubscriptionState;
   onOpenSubscriptionModal: (reason?: string) => void;
   onOpenAuthModal?: (mode?: 'signin' | 'signon') => void;
+  authUser?: { uid: string; email: string; displayName?: string; firstName?: string } | null;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -36,6 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   subscription,
   onOpenSubscriptionModal,
   onOpenAuthModal,
+  authUser,
 }) => {
   const isKycVerified = Boolean(
     profile.isVerified &&
@@ -151,12 +153,28 @@ export const Navbar: React.FC<NavbarProps> = ({
             {onOpenAuthModal && (
               <button
                 type="button"
-                onClick={() => onOpenAuthModal('signon')}
-                className="flex items-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-950/50 hover:bg-cyan-900/60 px-2.5 py-1.5 text-xs font-semibold text-cyan-200 transition shadow-sm"
-                title="Sign On (New User Registration) or Sign In"
+                onClick={() => onOpenAuthModal(authUser ? 'signin' : 'signon')}
+                className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition shadow-sm ${
+                  authUser
+                    ? 'border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-200'
+                    : 'border-cyan-500/40 bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-200'
+                }`}
+                title={
+                  authUser
+                    ? `Signed in as ${authUser.email} — Tap to manage account or sign out`
+                    : 'Sign Up (New User) or Log In with Email & Password'
+                }
               >
-                <UserPlus className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-                <span className="hidden sm:inline">Sign On</span>
+                <UserPlus
+                  className={`h-3.5 w-3.5 shrink-0 ${
+                    authUser ? 'text-emerald-400' : 'text-cyan-400'
+                  }`}
+                />
+                <span className="hidden sm:inline">
+                  {authUser
+                    ? authUser.firstName || authUser.displayName?.split(' ')[0] || 'Account'
+                    : 'Log In / Sign Up'}
+                </span>
               </button>
             )}
 
