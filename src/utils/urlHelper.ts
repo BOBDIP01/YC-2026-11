@@ -125,6 +125,16 @@ export function sanitizeProfileForPublicShare(profile: MasterProfile, card: Digi
     passions: vis.passions !== false ? profile.passions : [],
     education: vis.education !== false ? profile.education : [],
     portfolio: vis.portfolioSection !== false && vis.portfolio !== false ? profile.portfolio : [],
+    kycVerification: profile.kycVerification?.isCompleted
+      ? {
+          isCompleted: true,
+          firstName: '',
+          lastName: '',
+          email: '',
+          verifiedAt: profile.kycVerification.verifiedAt,
+          traceabilityId: profile.kycVerification.traceabilityId,
+        }
+      : undefined,
     storedPictures: [],
     storedBanners: [],
   };

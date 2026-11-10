@@ -1420,6 +1420,10 @@ Perform two tasks:
       rawDocNum.length > 4
         ? `${'*'.repeat(Math.max(4, rawDocNum.length - 4))}-${rawDocNum.slice(-4)}`
         : `****-${rawDocNum || '8492'}`;
+    // GDPR Art. 5(1)(c) Data Minimization: mask Date of Birth before persisting to traceability store
+    const cleanDobStr = String(extractedDob || '1989-08-24').trim();
+    const dateOfBirthMasked =
+      cleanDobStr.length >= 2 ? `****-**-${cleanDobStr.slice(-2)}` : '****-**-**';
 
     const hashPayload = `${traceabilityId}|${profileId}|${cleanFull}|${cleanEmail}|${documentType}|${issuingCountry}|${documentNumberMasked}|${biometricMatchScore}|${nowIso}`;
     const traceabilityHash = `SHA256:${crypto.createHash('sha256').update(hashPayload).digest('hex').slice(0, 32).toUpperCase()}`;
@@ -1435,7 +1439,7 @@ Perform two tasks:
       documentType,
       issuingCountry,
       documentNumberMasked,
-      dateOfBirth: extractedDob,
+      dateOfBirth: dateOfBirthMasked,
       expirationDate: extractedExpiry,
       documentConfidenceScore,
       biometricMatchScore,
@@ -1445,7 +1449,7 @@ Perform two tasks:
       extractedFields: {
         fullName: extractedFullName || cleanFull,
         documentNumber: documentNumberMasked,
-        dateOfBirth: extractedDob,
+        dateOfBirth: dateOfBirthMasked,
         issuingCountry,
         expirationDate: extractedExpiry,
         mrzStatus,
@@ -1624,7 +1628,9 @@ function sanitizePublishedProfile(rawProfile: any, card: any): any {
     headline: vis.headline !== false ? rawProfile.headline : '',
     bio: vis.bio !== false ? rawProfile.bio : '',
     avatarUrl: sanitizeSafeUrlString(rawProfile.avatarUrl) || '',
-    storedPictures: Array.isArray(rawProfile.storedPictures) ? rawProfile.storedPictures : [],
+    storedPictures: [],
+    storedBanners: [],
+    storedCorporateLogos: [],
     email: vis.workEmail || vis.email ? rawProfile.email : '',
     phone: vis.workPhone || vis.phone ? rawProfile.phone : '',
     website: vis.website ? sanitizeSafeUrlString(rawProfile.website) || '' : '',
@@ -1661,9 +1667,7 @@ app.post('/api/cards/publish', (req, res) => {
     if (
       existing &&
       existing.ownerToken &&
-      ownerToken &&
-      !safeCompareStrings(existing.ownerToken, String(ownerToken)) &&
-      existing.cardId !== keyId
+      (!ownerToken || !safeCompareStrings(existing.ownerToken, String(ownerToken)))
     ) {
       return res.status(403).json({ error: 'Vanity slug is already owned by another session.' });
     }
@@ -1774,9 +1778,12 @@ function extractCallerToken(req: express.Request): string | null {
 function verifyCallerAuthorizationForUid(req: express.Request, targetUid: string): boolean {
   if (!targetUid || targetUid === 'anonymous') return true;
   const token = extractCallerToken(req);
+  if (!token) {
+    return false;
+  }
 
-  // If a Bearer JWT is present with 3 segments, verify `sub` or `user_id` claim matches targetUid
-  if (token && token.split('.').length === 3) {
+  // If a Bearer JWT is present with 3 segments, verify `sub`/`user_id` claim, `exp`, and `aud`
+  if (token.split('.').length === 3) {
     try {
       const payloadJson = Buffer.from(token.split('.')[1], 'base64url').toString('utf8');
       const payload = JSON.parse(payloadJson);
@@ -1784,21 +1791,41 @@ function verifyCallerAuthorizationForUid(req: express.Request, targetUid: string
       if (tokenUid && tokenUid !== targetUid) {
         return false;
       }
+      if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now() - 60_000) {
+        return false;
+      }
+      const expectedProjectId = process.env.VITE_FIREBASE_PROJECT_ID;
+      if (
+        expectedProjectId &&
+        payload.aud &&
+        typeof payload.aud === 'string' &&
+        payload.aud !== expectedProjectId
+      ) {
+        return false;
+      }
     } catch {
-      // Non-JWT bearer token; fall through to token hash binding
+      return false;
     }
   }
 
   const existingHash = uidTokenHashStore.get(targetUid);
-  if (!token) {
-    // If the UID is already bound to an authenticated token, reject unauthenticated access
-    return !existingHash;
-  }
-
   const incomingHash = crypto.createHash('sha256').update(token).digest('hex');
   if (!existingHash) {
     uidTokenHashStore.set(targetUid, incomingHash);
     return true;
+  }
+  // Allow refreshed Firebase JWTs for the same verified `user_id`/`sub`, or exact matching ownerToken hash
+  if (token.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+      const tokenUid = payload.user_id || payload.sub || payload.uid;
+      if (tokenUid && tokenUid === targetUid) {
+        uidTokenHashStore.set(targetUid, incomingHash);
+        return true;
+      }
+    } catch {
+      return false;
+    }
   }
   return safeCompareStrings(existingHash, incomingHash);
 }
@@ -1984,7 +2011,7 @@ app.post('/api/cloud/sync', (req, res) => {
   }
 });
 
-app.get('/api/cloud/sync/:uid', (req, res) => {
+app.get(['/api/cloud/sync/:uid', '/api/cloud/snapshot/:uid'], (req, res) => {
   const cleanUid = String(req.params.uid);
   if (!verifyCallerAuthorizationForUid(req, cleanUid)) {
     return res.status(403).json({ error: 'Forbidden: Bearer token does not match target uid.' });
@@ -1993,7 +2020,7 @@ app.get('/api/cloud/sync/:uid', (req, res) => {
   if (!snapshot) {
     return res.status(404).json({ error: 'No cloud snapshot found for user' });
   }
-  return res.json(snapshot);
+  return res.json({ snapshot, ...snapshot });
 });
 
 // Apple Universal Links & Android App Links Verification Endpoints
@@ -2408,7 +2435,7 @@ app.post('/api/p2p-radar/rooms', (req, res) => {
       creatorKey,
       isDefault: false,
       hostCard: hostCard || undefined,
-      hostProfile: hostProfile || undefined,
+      hostProfile: hostProfile ? sanitizePublishedProfile(hostProfile, hostCard) : undefined,
     };
 
     radarRooms.set(roomId, newRoom);

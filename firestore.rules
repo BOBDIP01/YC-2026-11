@@ -1,25 +1,124 @@
 rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures:
+//
+// Collection: users
+// Document ID: {userId} (matches Firebase Auth UID)
+// Fields:
+//   - uid: string (required, immutable, 1..128 chars, must equal userId & request.auth.uid) - Owner Firebase UID
+//   - profile: map (optional, max 60 keys) - Primary MasterProfile snapshot
+//   - personas: list (optional, max 25 items) - Array of MasterProfile personas
+//   - cards: list (optional, max 50 items) - Array of DigitalCard configurations
+//   - contacts: list (optional, max 2000 items) - Array of CRMContact records
+//   - subscription: map (optional, max 30 keys) - User SubscriptionState mirror
+//   - updatedAt: string (required, ISO-8601 timestamp, 10..64 chars) - Last sync timestamp
+//
+// Collection: public_cards
+// Document ID: {slug} (2..80 chars, lowercase vanity slug or card ID)
+// Fields:
+//   - slug: string (required, immutable, 2..80 chars, must equal document ID {slug}) - Public vanity slug
+//   - cardId: string (required, 1..100 chars) - Associated DigitalCard ID
+//   - ownerUid: string (required, immutable, 1..128 chars, must equal request.auth.uid) - Card owner UID
+//   - card: map (required, max 50 keys) - DigitalCard public layout configuration
+//   - profile: map (required, max 50 keys) - Sanitized public profile fields (no unshared PII)
+//   - publishedAt: string (required, ISO-8601 timestamp, 10..64 chars) - Last publish timestamp
+//
+// ===============================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions for zero-trust access & payload bounds
-    function isSignedIn() {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function isSignedIn() {
+      return isAuthenticated();
     }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.size() >= 10 &&
+        dateStr.size() <= 64 &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators (Used in BOTH create and update rules)
+    // ===============================================================
+
+    function isValidUserSnapshot(data, userId) {
+      return hasRequiredFields(['uid', 'updatedAt'])
+        && hasOnlyAllowedFields(['uid', 'profile', 'personas', 'cards', 'contacts', 'subscription', 'updatedAt'])
+        && data.uid is string
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && isValidDateString(data.updatedAt)
+        && (!('profile' in data) || (data.profile is map && data.profile.keys().size() <= 60))
+        && (!('personas' in data) || (data.personas is list && data.personas.size() <= 25))
+        && (!('cards' in data) || (data.cards is list && data.cards.size() <= 50))
+        && (!('contacts' in data) || (data.contacts is list && data.contacts.size() <= 2000))
+        && (!('subscription' in data) || (data.subscription is map && data.subscription.keys().size() <= 30));
+    }
+
+    function isValidPublicCard(data, slug) {
+      return slug.size() >= 2
+        && slug.size() <= 80
+        && hasRequiredFields(['slug', 'cardId', 'ownerUid', 'card', 'profile', 'publishedAt'])
+        && hasOnlyAllowedFields(['slug', 'cardId', 'ownerUid', 'card', 'profile', 'publishedAt'])
+        && data.slug is string
+        && data.slug == slug
+        && data.slug.size() >= 2
+        && data.slug.size() <= 80
+        && data.cardId is string
+        && data.cardId.size() >= 1
+        && data.cardId.size() <= 100
+        && data.ownerUid is string
+        && data.ownerUid == request.auth.uid
+        && data.ownerUid.size() >= 1
+        && data.ownerUid.size() <= 128
+        && data.card is map
+        && data.card.keys().size() <= 50
+        && data.profile is map
+        && data.profile.keys().size() <= 50
+        && isValidDateString(data.publishedAt);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
 
     // User account, profiles, CRM contacts, and subscription mirror
     // Strictly scoped to the authenticated Firebase UID (GDPR & Store Data Safety)
     match /users/{userId} {
       allow read, delete: if isOwner(userId);
-      allow create, update: if isOwner(userId)
-                            && request.resource.data.keys().size() <= 25;
-
-      match /{allSubcollections=**} {
-        allow read, write, delete: if isOwner(userId);
-      }
+      allow create: if isOwner(userId)
+                    && isValidUserSnapshot(request.resource.data, userId);
+      allow update: if isOwner(userId)
+                    && isValidUserSnapshot(request.resource.data, userId)
+                    && request.resource.data.uid == resource.data.uid;
     }
 
     // Public digital business cards (/p/:slug)
@@ -27,14 +126,12 @@ service cloud.firestore {
     match /public_cards/{slug} {
       allow read: if true;
       allow create: if isSignedIn()
-                    && slug.size() >= 2
-                    && slug.size() <= 80
-                    && request.resource.data.ownerUid == request.auth.uid
-                    && request.resource.data.keys().size() <= 20;
+                    && isValidPublicCard(request.resource.data, slug);
       allow update: if isSignedIn()
                     && resource.data.ownerUid == request.auth.uid
-                    && request.resource.data.ownerUid == request.auth.uid
-                    && request.resource.data.keys().size() <= 20;
+                    && request.resource.data.ownerUid == resource.data.ownerUid
+                    && request.resource.data.slug == resource.data.slug
+                    && isValidPublicCard(request.resource.data, slug);
       allow delete: if isSignedIn()
                     && resource.data.ownerUid == request.auth.uid;
     }

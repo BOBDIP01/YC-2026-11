@@ -412,10 +412,7 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
       const record: KycTraceabilityRecord = data.record;
       setLatestRecord(record);
 
-      // Update profile with verified status & traceability metadata -> unlocks green tick mark on image!
-      const compactDocThumb = await compressImageDataUrl(documentImage, 320, 0.7);
-      const compactSelfieThumb = await compressImageDataUrl(selfieImage, 320, 0.7);
-
+      // Enforce Zero-Raw-Retention Biometric Policy: purge raw document & selfie images immediately after verification
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
       const updatedProfile: MasterProfile = {
         ...profile,
@@ -445,17 +442,16 @@ export const KYCSettingsEngine: React.FC<KYCSettingsEngineProps> = ({
           documentType: record.documentType,
           issuingCountry: record.issuingCountry,
           documentNumberMasked: record.documentNumberMasked,
-          dateOfBirth: record.dateOfBirth,
           expirationDate: record.expirationDate,
           documentConfidenceScore: record.documentConfidenceScore,
           biometricMatchScore: record.biometricMatchScore,
           livenessVerified: record.livenessVerified,
           comparisonSummary: record.comparisonSummary,
-          documentThumbUrl: compactDocThumb,
-          selfieThumbUrl: compactSelfieThumb,
         },
       };
 
+      setDocumentImage(null);
+      setSelfieImage(null);
       onUpdateProfile(updatedProfile);
       await fetchTraceabilityRecords();
     } catch (err: any) {
