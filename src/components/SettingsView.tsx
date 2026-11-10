@@ -456,22 +456,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setTimeout(() => setCopiedSection(null), 2000);
   };
 
-  // Top-Up Credits / AI Booster Pack Action
+  // Top-Up Credits / AI Booster Pack Action — always routes through verified SubscriptionModal checkout
   const handleConfirmTopUp = () => {
-    if (onBuyBoosterPack) {
-      onBuyBoosterPack();
-    } else {
-      const addCredits = selectedTopUpPackage === '10' ? 10 : selectedTopUpPackage === '50' ? 50 : 250;
-      onUpdateProfile({
-        ...profile,
-        aiCredits: (profile.aiCredits || 0) + addCredits,
-      });
-    }
-    setTopUpSuccess(true);
-    setTimeout(() => {
-      setTopUpSuccess(false);
-      setIsTopUpModalOpen(false);
-    }, 1200);
+    setIsTopUpModalOpen(false);
+    onOpenSubscriptionModal?.();
   };
 
   const isKycVerified = Boolean(
@@ -1454,7 +1442,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           </div>
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => onBuyBoosterPack ? onBuyBoosterPack() : setIsTopUpModalOpen(true)}
+                              onClick={() => onOpenSubscriptionModal?.()}
                               className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-md shadow-amber-500/20 transition"
                             >
                               <Zap className="h-4 w-4" />
@@ -1543,7 +1531,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                                 </div>
                               </div>
                               <button
-                                onClick={() => onChangeTier?.(tKey)}
+                                onClick={() => {
+                                  if (tKey === 'free') {
+                                    onChangeTier?.('free');
+                                  } else {
+                                    onOpenSubscriptionModal?.();
+                                  }
+                                }}
                                 disabled={isCurrent}
                                 className={`mt-4 w-full py-2 rounded-lg text-xs font-bold transition ${
                                   isCurrent

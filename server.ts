@@ -96,10 +96,21 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
+  // Explicitly block any HTTP request attempting to probe sensitive config, dotfiles, source maps, or server files
+  const lowerPath = req.path.toLowerCase();
+  if (
+    lowerPath.startsWith('/.env') ||
+    lowerPath.startsWith('/.git') ||
+    lowerPath.endsWith('.map') ||
+    lowerPath === '/server.ts' ||
+    lowerPath === '/firestore.rules'
+  ) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   next();
 });
 
-// Per-IP Rate Limiter for AI, KYC, Billing, Cloud Sync, Privacy Purge, and Card Publishing Endpoints
+// Per-IP Rate Limiter & Daily Server-Side AI Quota Enforcer
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 function checkRateLimit(ip: string, bucketKey: string, maxRequests: number, windowMs: number): boolean {
   const now = Date.now();
@@ -119,8 +130,11 @@ function checkRateLimit(ip: string, bucketKey: string, maxRequests: number, wind
 app.use('/api', (req, res, next) => {
   const clientIp = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
   if (req.path.startsWith('/ai/') || req.path.startsWith('/kyc/verify')) {
-    if (!checkRateLimit(clientIp, 'ai_kyc', 30, 60_000)) {
+    if (!checkRateLimit(clientIp, 'ai_kyc', 20, 60_000)) {
       return res.status(429).json({ error: 'Rate limit exceeded. Please wait a moment before making additional AI requests.' });
+    }
+    if (!checkRateLimit(clientIp, 'ai_daily_cap', 100, 86_400_000)) {
+      return res.status(429).json({ error: 'Daily AI utilization limit reached for this session.' });
     }
   } else if (req.path.startsWith('/cards/publish')) {
     if (!checkRateLimit(clientIp, 'publish', 120, 60_000)) {
@@ -129,6 +143,7 @@ app.use('/api', (req, res, next) => {
   } else if (
     req.path.startsWith('/cloud/') ||
     req.path.startsWith('/billing/') ||
+    req.path.startsWith('/auth/') ||
     req.path.startsWith('/privacy/purge')
   ) {
     if (!checkRateLimit(clientIp, 'sensitive_account_ops', 60, 60_000)) {
@@ -1848,6 +1863,140 @@ function getOrCreateEntitlement(appUserId: string): UserEntitlementState {
   return initial;
 }
 
+// Idempotency Registry of processed transaction & webhook IDs to prevent duplicate grants on network/Wi-Fi retries
+const processedBillingTransactions = new Set<string>();
+
+// Server-Side Firebase Identity Toolkit & Runtime Config Proxy (keeps VITE_FIREBASE_API_KEY out of static client bundle)
+function getServerFirebaseApiKey(): string {
+  return String(process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || '').trim();
+}
+
+app.get('/api/auth/sdk-config', (_req, res) => {
+  const apiKey = getServerFirebaseApiKey();
+  const projectId = String(process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '').trim();
+  // Never return the raw apiKey over the network; all Auth REST calls are proxied server-side via /api/auth/*
+  res.json({
+    configured: Boolean(apiKey && projectId),
+    config: {
+      projectId,
+    },
+  });
+});
+
+app.post('/api/auth/signup', async (req, res) => {
+  const apiKey = getServerFirebaseApiKey();
+  if (!apiKey) return res.status(503).json({ error: 'Authentication service not configured.' });
+  const { email, password, displayName } = req.body || {};
+  try {
+    const fbRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: String(email || '').trim().toLowerCase(),
+          password: String(password || ''),
+          displayName: String(displayName || '').trim(),
+          returnSecureToken: true,
+        }),
+      }
+    );
+    const data = await fbRes.json();
+    return res.status(fbRes.status).json(data);
+  } catch (err: any) {
+    return res.status(502).json({ error: err?.message || 'Upstream auth error' });
+  }
+});
+
+app.post('/api/auth/signin', async (req, res) => {
+  const apiKey = getServerFirebaseApiKey();
+  if (!apiKey) return res.status(503).json({ error: 'Authentication service not configured.' });
+  const { email, password } = req.body || {};
+  try {
+    const fbRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: String(email || '').trim().toLowerCase(),
+          password: String(password || ''),
+          returnSecureToken: true,
+        }),
+      }
+    );
+    const data = await fbRes.json();
+    return res.status(fbRes.status).json(data);
+  } catch (err: any) {
+    return res.status(502).json({ error: err?.message || 'Upstream auth error' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const apiKey = getServerFirebaseApiKey();
+  if (!apiKey) return res.status(503).json({ error: 'Authentication service not configured.' });
+  const { email } = req.body || {};
+  try {
+    const fbRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestType: 'PASSWORD_RESET',
+          email: String(email || '').trim().toLowerCase(),
+        }),
+      }
+    );
+    const data = await fbRes.json();
+    return res.status(fbRes.status).json(data);
+  } catch (err: any) {
+    return res.status(502).json({ error: err?.message || 'Upstream auth error' });
+  }
+});
+
+app.post('/api/auth/delete-account', async (req, res) => {
+  const apiKey = getServerFirebaseApiKey();
+  if (!apiKey) return res.status(503).json({ error: 'Authentication service not configured.' });
+  const { idToken } = req.body || {};
+  if (!idToken || typeof idToken !== 'string') {
+    return res.status(400).json({ error: 'idToken is required' });
+  }
+  try {
+    const fbRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      }
+    );
+    const data = await fbRes.json();
+    return res.status(fbRes.status).json(data);
+  } catch (err: any) {
+    return res.status(502).json({ error: err?.message || 'Upstream auth error' });
+  }
+});
+
+// Platform-Scoped StoreKit / Play Billing SDK Bootstrap (keeps RevenueCat keys out of static client bundle)
+app.post('/api/billing/sdk-session', (req, res) => {
+  const platform = String(req.body?.platform || req.headers['x-client-platform'] || 'web').toLowerCase();
+  const appleKey = String(process.env.REVENUECAT_APPLE_API_KEY || process.env.VITE_REVENUECAT_APPLE_API_KEY || '').trim();
+  const googleKey = String(process.env.REVENUECAT_GOOGLE_API_KEY || process.env.VITE_REVENUECAT_GOOGLE_API_KEY || '').trim();
+  const webKey = String(process.env.REVENUECAT_WEB_API_KEY || process.env.VITE_REVENUECAT_WEB_API_KEY || '').trim();
+
+  if (platform === 'ios') {
+    return res.json({ configured: Boolean(appleKey), sdkKey: appleKey });
+  }
+  if (platform === 'android') {
+    return res.json({ configured: Boolean(googleKey), sdkKey: googleKey });
+  }
+  return res.json({
+    configured: Boolean(webKey || appleKey || googleKey),
+    sdkKey: webKey && webKey.startsWith('rcb_') ? webKey : '',
+  });
+});
+
 // RevenueCat Server-to-Server Webhook Endpoint
 // Configure in RevenueCat Dashboard -> Integrations -> Webhooks -> POST /api/webhooks/revenuecat
 app.post('/api/webhooks/revenuecat', (req, res) => {
@@ -1870,6 +2019,7 @@ app.post('/api/webhooks/revenuecat', (req, res) => {
     }
 
     const event = req.body?.event || req.body || {};
+    const eventId = String(event.id || event.transaction_id || '').trim();
     const eventType = String(event.type || 'UNKNOWN').toUpperCase();
     const appUserId = String(event.app_user_id || event.original_app_user_id || 'anonymous');
     const productId = String(event.product_id || '');
@@ -1880,6 +2030,16 @@ app.post('/api/webhooks/revenuecat', (req, res) => {
         : [];
 
     const state = getOrCreateEntitlement(appUserId);
+
+    // Idempotency guard: if RevenueCat retries the same webhook event after a network timeout, do not double-credit
+    if (eventId) {
+      const dedupeKey = `webhook:${eventId}`;
+      if (processedBillingTransactions.has(dedupeKey)) {
+        return res.json({ received: true, alreadyProcessed: true, state });
+      }
+      processedBillingTransactions.add(dedupeKey);
+    }
+
     state.lastEvent = eventType;
     state.updatedAt = new Date().toISOString();
 
@@ -1936,7 +2096,6 @@ app.post('/api/billing/verify-receipt', (req, res) => {
       tier,
       transactionId,
       isConsumable,
-      coinsGranted = 50,
     } = req.body || {};
 
     const cleanUid = String(appUserId);
@@ -1944,34 +2103,55 @@ app.post('/api/billing/verify-receipt', (req, res) => {
       return res.status(403).json({ error: 'Forbidden: Bearer token does not match appUserId.' });
     }
 
-    const state = getOrCreateEntitlement(cleanUid);
-    state.updatedAt = new Date().toISOString();
-    state.lastEvent = transactionId ? `VERIFIED_${transactionId}` : 'CLIENT_SYNC';
+    const cleanTxId = String(transactionId || '').trim();
+    if (!cleanTxId || cleanTxId.length < 6) {
+      return res.status(400).json({ error: 'A valid store transactionId is required for receipt verification.' });
+    }
 
-    // Cap consumable grant to a maximum of 50 coins per receipt verification to prevent parameter tampering
-    const safeCoinsGranted = Math.min(Math.max(Number(coinsGranted) || 50, 1), 50);
+    // Reject client-forged synthetic sandbox receipts
+    if (cleanTxId.startsWith('rc_sbx_')) {
+      return res.status(403).json({ error: 'Unverified synthetic receipt rejected.' });
+    }
+
+    const state = getOrCreateEntitlement(cleanUid);
+    const dedupeKey = `receipt:${cleanUid}:${cleanTxId}`;
+    if (processedBillingTransactions.has(dedupeKey)) {
+      return res.json({
+        verified: true,
+        alreadyProcessed: true,
+        entitlement: state,
+      });
+    }
+    processedBillingTransactions.add(dedupeKey);
+
+    state.updatedAt = new Date().toISOString();
+    state.lastEvent = `VERIFIED_${cleanTxId}`;
+
+    // Fixed 50-coin booster grant (never trust client-supplied coinsGranted parameter)
+    const FIXED_BOOSTER_GRANT = 50;
+    const normalizedTier = String(tier || '').toUpperCase();
 
     if (isConsumable || String(productId).includes('booster')) {
-      state.boosterBalance += safeCoinsGranted;
+      state.boosterBalance += FIXED_BOOSTER_GRANT;
       const exp = new Date();
       exp.setMonth(exp.getMonth() + 3);
       state.boosterExpiresAt = exp.toISOString();
-    } else if (tier === 'BUSINESS' || String(productId).includes('business')) {
+    } else if (normalizedTier === 'BUSINESS' || String(productId).includes('business')) {
       state.tier = 'BUSINESS';
       state.activeEntitlements = ['business_access', 'basic_access'];
       state.activeSubscriptions = [productId || 'youconnect_business_monthly'];
-    } else if (tier === 'BASIC' || String(productId).includes('basic')) {
+    } else if (normalizedTier === 'BASIC' || String(productId).includes('basic')) {
       state.tier = 'BASIC';
       state.activeEntitlements = ['basic_access'];
       state.activeSubscriptions = [productId || 'youconnect_basic_monthly'];
-    } else if (tier === 'FREE') {
+    } else if (normalizedTier === 'FREE') {
       state.tier = 'FREE';
       state.activeEntitlements = [];
       state.activeSubscriptions = [];
     }
 
     userEntitlementsStore.set(cleanUid, state);
-    return res.json({ verified: true, entitlement: state });
+    return res.json({ verified: true, alreadyProcessed: false, entitlement: state });
   } catch (err: any) {
     return res.status(500).json({ error: 'Receipt verification failed', details: err.message });
   }

@@ -47,31 +47,53 @@ export interface CloudUserSnapshot {
   updatedAt: string;
 }
 
-const env = (import.meta as any).env || {};
+let runtimeFirebaseConfig: FirebaseConfig = {
+  apiKey: '',
+  authDomain: '',
+  projectId: '',
+  storageBucket: '',
+  messagingSenderId: '',
+  appId: '',
+};
+let runtimeFirebaseConfigLoaded = false;
+let runtimeServerAuthConfigured = true;
+
+async function ensureRuntimeFirebaseConfig(): Promise<FirebaseConfig> {
+  if (runtimeFirebaseConfigLoaded) return runtimeFirebaseConfig;
+  try {
+    const res = await apiFetch('/api/auth/sdk-config');
+    if (res.ok) {
+      const data = await res.json();
+      runtimeServerAuthConfigured = Boolean(data?.configured);
+      if (data?.config) {
+        runtimeFirebaseConfig = {
+          apiKey: String(data.config.apiKey || '').trim(),
+          authDomain: String(data.config.authDomain || '').trim(),
+          projectId: String(data.config.projectId || '').trim(),
+          storageBucket: String(data.config.storageBucket || '').trim(),
+          messagingSenderId: String(data.config.messagingSenderId || '').trim(),
+          appId: String(data.config.appId || '').trim(),
+          measurementId: String(data.config.measurementId || '').trim() || undefined,
+        };
+      }
+      runtimeFirebaseConfigLoaded = true;
+    }
+  } catch {
+    // Offline fallback
+  }
+  return runtimeFirebaseConfig;
+}
 
 export function getFirebaseConfig(): FirebaseConfig {
-  return {
-    apiKey: String(env.VITE_FIREBASE_API_KEY || '').trim(),
-    authDomain: String(env.VITE_FIREBASE_AUTH_DOMAIN || '').trim(),
-    projectId: String(env.VITE_FIREBASE_PROJECT_ID || '').trim(),
-    storageBucket: String(env.VITE_FIREBASE_STORAGE_BUCKET || '').trim(),
-    messagingSenderId: String(env.VITE_FIREBASE_MESSAGING_SENDER_ID || '').trim(),
-    appId: String(env.VITE_FIREBASE_APP_ID || '').trim(),
-    measurementId: String(env.VITE_FIREBASE_MEASUREMENT_ID || '').trim() || undefined,
-  };
+  return runtimeFirebaseConfig;
 }
 
 /**
- * Checks whether live Firebase project credentials have been configured in `.env`.
+ * Checks whether live Firebase project credentials have been configured on the backend.
  */
 export function isFirebaseConfigured(): boolean {
-  const cfg = getFirebaseConfig();
-  return Boolean(
-    cfg.apiKey &&
-      cfg.apiKey !== 'YOUR_FIREBASE_API_KEY' &&
-      cfg.projectId &&
-      cfg.projectId !== 'YOUR_FIREBASE_PROJECT_ID'
-  );
+  if (!runtimeFirebaseConfigLoaded) return true;
+  return runtimeServerAuthConfigured;
 }
 
 const AUTH_SESSION_STORAGE_KEY = 'youconnect_firebase_auth_user_v1';
@@ -107,11 +129,16 @@ export async function initFirebaseServices(): Promise<{
   isConfigured: boolean;
   projectId: string;
 }> {
-  const config = getFirebaseConfig();
+  const config = await ensureRuntimeFirebaseConfig();
   const configured = isFirebaseConfigured();
 
   if (!configured) {
     return { isLiveSdk: false, isConfigured: false, projectId: 'local-emulation' };
+  }
+
+  // When the backend keeps the Firebase API key server-only, use the server-proxied /api/auth/* & /api/cloud/* routes
+  if (!config.apiKey) {
+    return { isLiveSdk: false, isConfigured: true, projectId: config.projectId || 'youconnect-prod' };
   }
 
   if (sdkApp && sdkAuth) {
@@ -365,24 +392,20 @@ export async function registerWithFirebaseEmail(params: {
     }
   }
 
-  // 2. Firebase Identity Toolkit REST API path (when VITE_FIREBASE_API_KEY is set)
+  // 2. Server-Proxied Firebase Identity Toolkit path (keeps API key on backend)
   if (isFirebaseConfigured()) {
-    const res = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(config.apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          password: rawPassword,
-          displayName: fullName,
-          returnSecureToken: true,
-        }),
-      }
-    );
+    const res = await apiFetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        password: rawPassword,
+        displayName: fullName,
+      }),
+    });
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(formatFirebaseAuthError(data?.error?.message || 'Firebase registration failed'));
+      throw new Error(formatFirebaseAuthError(data?.error?.message || data?.error || 'Registration failed'));
     }
     const user: AuthenticatedUser = {
       uid: data.localId,
@@ -489,23 +512,19 @@ export async function signInWithFirebaseEmail(params: {
     }
   }
 
-  // 2. Firebase Identity Toolkit REST API path
+  // 2. Server-Proxied Firebase Identity Toolkit path (keeps API key on backend)
   if (isFirebaseConfigured()) {
-    const res = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(config.apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          password: rawPassword,
-          returnSecureToken: true,
-        }),
-      }
-    );
+    const res = await apiFetch('/api/auth/signin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        password: rawPassword,
+      }),
+    });
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(formatFirebaseAuthError(data?.error?.message || 'Invalid email or password'));
+      throw new Error(formatFirebaseAuthError(data?.error?.message || data?.error || 'Invalid email or password'));
     }
     const displayName = data.displayName || cleanEmail.split('@')[0];
     const parts = displayName.trim().split(/\s+/);
@@ -584,20 +603,16 @@ export async function sendFirebasePasswordReset(email: string): Promise<{ sent: 
   }
 
   if (isFirebaseConfigured()) {
-    const res = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${encodeURIComponent(config.apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestType: 'PASSWORD_RESET',
-          email: cleanEmail,
-        }),
-      }
-    );
+    const res = await apiFetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+      }),
+    });
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(formatFirebaseAuthError(data?.error?.message || 'Failed to send password reset email'));
+      throw new Error(formatFirebaseAuthError(data?.error?.message || data?.error || 'Failed to send password reset email'));
     }
     return {
       sent: true,
@@ -908,14 +923,11 @@ export async function deleteFirebaseAccountAndCloudData(params: {
     }
   } else if (isFirebaseConfigured() && user?.idToken && !user.idToken.startsWith('local_jwt_')) {
     try {
-      await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${encodeURIComponent(config.apiKey)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken: user.idToken }),
-        }
-      );
+      await apiFetch('/api/auth/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: user.idToken }),
+      });
     } catch {
       // ignore if offline
     }

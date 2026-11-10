@@ -58,38 +58,38 @@ export interface PurchaseOutcome {
   message: string;
 }
 
-const env = (import.meta as any).env || {};
-
 function loadDynamicModule(specifier: string): Promise<any> {
   return import(/* @vite-ignore */ specifier);
 }
 
-/**
- * Returns the RevenueCat Public API Key for the active platform (iOS `appl_...`, Android `goog_...`, or Web `rcb_...`).
- */
-export function getRevenueCatApiKey(): string {
-  const platform = getRuntimePlatform();
-  if (platform === 'ios') {
-    return String(env.VITE_REVENUECAT_APPLE_API_KEY || env.VITE_RC_IOS_API_KEY || '').trim();
+let cachedRuntimeSdkKey: string | null = null;
+let runtimeConfiguredFlag = true;
+
+async function fetchRuntimeBillingSdkKey(platform: 'ios' | 'android' | 'web'): Promise<string> {
+  if (cachedRuntimeSdkKey !== null) return cachedRuntimeSdkKey;
+  try {
+    const res = await apiFetch('/api/billing/sdk-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Client-Platform': platform,
+      },
+      body: JSON.stringify({ platform }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      runtimeConfiguredFlag = Boolean(data?.configured);
+      cachedRuntimeSdkKey = String(data?.sdkKey || '').trim();
+      return cachedRuntimeSdkKey;
+    }
+  } catch {
+    // Offline or unreachable
   }
-  if (platform === 'android') {
-    return String(env.VITE_REVENUECAT_GOOGLE_API_KEY || env.VITE_RC_ANDROID_API_KEY || '').trim();
-  }
-  return String(
-    env.VITE_REVENUECAT_WEB_API_KEY ||
-      env.VITE_REVENUECAT_APPLE_API_KEY ||
-      env.VITE_REVENUECAT_GOOGLE_API_KEY ||
-      ''
-  ).trim();
+  return '';
 }
 
 export function isRevenueCatConfigured(): boolean {
-  const key = getRevenueCatApiKey();
-  return Boolean(
-    key &&
-      !key.startsWith('YOUR_') &&
-      (key.startsWith('appl_') || key.startsWith('goog_') || key.startsWith('rcb_') || key.length > 12)
-  );
+  return runtimeConfiguredFlag;
 }
 
 let rcNativePurchases: any = null;
@@ -157,10 +157,10 @@ export async function initializeRevenueCat(customAppUserId?: string): Promise<{
       : 'rc_anon_server');
 
   const platform = getRuntimePlatform();
-  const apiKey = getRevenueCatApiKey();
+  const apiKey = await fetchRuntimeBillingSdkKey(platform);
 
   // 1. Native iOS / Android Capacitor RevenueCat SDK
-  if (isNativeMobilePlatform() && isRevenueCatConfigured()) {
+  if (isNativeMobilePlatform() && apiKey) {
     try {
       const capMod = await loadDynamicModule('@revenuecat/purchases-capacitor');
       const Purchases = capMod.Purchases || capMod.default;
@@ -182,12 +182,12 @@ export async function initializeRevenueCat(customAppUserId?: string): Promise<{
         };
       }
     } catch (err) {
-      console.warn('RevenueCat Capacitor SDK initialization fallback:', err);
+      console.warn('Native Store SDK initialization warning:', err);
     }
   }
 
   // 2. RevenueCat Web Billing SDK (`@revenuecat/purchases-js`)
-  if (!isNativeMobilePlatform() && isRevenueCatConfigured() && apiKey.startsWith('rcb_')) {
+  if (!isNativeMobilePlatform() && apiKey && apiKey.startsWith('rcb_')) {
     try {
       const webMod = await loadDynamicModule('@revenuecat/purchases-js');
       const Purchases = webMod.Purchases || webMod.default;
@@ -201,13 +201,13 @@ export async function initializeRevenueCat(customAppUserId?: string): Promise<{
         };
       }
     } catch (err) {
-      console.warn('RevenueCat Web SDK initialization fallback:', err);
+      console.warn('Web Billing SDK initialization warning:', err);
     }
   }
 
   rcInitializedForUser = appUserId;
   return {
-    initialized: isRevenueCatConfigured(),
+    initialized: Boolean(rcNativePurchases || rcWebInstance),
     provider:
       platform === 'ios'
         ? 'apple_storekit2'
@@ -300,9 +300,7 @@ export async function fetchRevenueCatOfferings(): Promise<RevenueCatPackageDispl
 export async function purchaseSubscriptionTierWithRevenueCat(
   targetTier: SubscriptionTier
 ): Promise<PurchaseOutcome> {
-  const initInfo = await initializeRevenueCat();
-
-  // Switching to Free tier cancels/downgrades at next renewal or switches in sandbox
+  // Switching to Free tier cancels/downgrades at next renewal
   if (targetTier === 'free') {
     return {
       success: true,
@@ -311,6 +309,16 @@ export async function purchaseSubscriptionTierWithRevenueCat(
       message: 'Plan set to Free Starter Tier ($0). Manage active store auto-renewals in device Account Settings.',
     };
   }
+
+  // Strict Offline / Wi-Fi Disconnect Guard: never allow paid tier activation while offline
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return {
+      success: false,
+      message: 'Network connection unavailable. Please reconnect to Wi-Fi or cellular data to complete your purchase.',
+    };
+  }
+
+  const initInfo = await initializeRevenueCat();
 
   const targetProductId =
     targetTier === 'business'
@@ -342,26 +350,43 @@ export async function purchaseSubscriptionTierWithRevenueCat(
         }
       }
 
-      if (purchaseResult?.customerInfo) {
-        const verifiedTier = mapCustomerInfoToTier(purchaseResult.customerInfo);
-        const txId =
-          purchaseResult.transaction?.transactionIdentifier || `sk2_${Date.now()}`;
-
-        await notifyBackendReceiptVerified({
-          appUserId: initInfo.appUserId,
-          productId: targetProductId,
-          tier: verifiedTier,
-          transactionId: txId,
-          provider: initInfo.provider,
-        });
-
+      const txId = purchaseResult?.transaction?.transactionIdentifier;
+      if (!purchaseResult?.customerInfo || !txId) {
         return {
-          success: true,
-          tier: verifiedTier,
-          transactionId: txId,
-          message: `Your ${verifiedTier === 'business' ? 'Business' : 'Basic'} plan is now active!`,
+          success: false,
+          message: 'Store purchase could not be completed or verified. Please check your network connection and try again.',
         };
       }
+
+      const verifiedTier = mapCustomerInfoToTier(purchaseResult.customerInfo);
+      if (verifiedTier !== targetTier && !(targetTier === 'basic' && verifiedTier === 'business')) {
+        return {
+          success: false,
+          message: 'Entitlement verification did not match the requested plan. No upgrade was applied.',
+        };
+      }
+
+      const serverCheck = await verifyReceiptWithBackend({
+        appUserId: initInfo.appUserId,
+        productId: targetProductId,
+        tier: verifiedTier,
+        transactionId: txId,
+        provider: initInfo.provider,
+      });
+
+      if (!serverCheck.verified) {
+        return {
+          success: false,
+          message: serverCheck.error || 'Could not verify purchase receipt with server. Please use Restore Purchases once online.',
+        };
+      }
+
+      return {
+        success: true,
+        tier: verifiedTier,
+        transactionId: txId,
+        message: `Your ${verifiedTier === 'business' ? 'Business' : 'Basic'} plan is now active!`,
+      };
     } catch (err: any) {
       if (err?.userCancelled || err?.code === '1' || err?.message?.includes('cancelled')) {
         return {
@@ -370,7 +395,10 @@ export async function purchaseSubscriptionTierWithRevenueCat(
           message: 'Purchase cancelled.',
         };
       }
-      throw new Error(err?.message || 'Subscription transaction could not be completed.');
+      return {
+        success: false,
+        message: err?.message || 'Subscription transaction could not be completed due to a network or store error.',
+      };
     }
   }
 
@@ -379,17 +407,48 @@ export async function purchaseSubscriptionTierWithRevenueCat(
     try {
       const offerings = await rcWebInstance.getOfferings();
       const pkgs: any[] = offerings?.current?.availablePackages || [];
-      const pkg = pkgs.find((p) => p.rcBillingProduct?.identifier === targetProductId) || pkgs[0];
-      if (pkg) {
-        const { customerInfo } = await rcWebInstance.purchase({ rcPackage: pkg });
-        const verifiedTier = mapCustomerInfoToTier(customerInfo);
+      const pkg = pkgs.find((p) => p.rcBillingProduct?.identifier === targetProductId);
+      if (!pkg) {
         return {
-          success: true,
-          tier: verifiedTier,
-          transactionId: `rc_web_${Date.now()}`,
-          message: `Your ${targetTier === 'business' ? 'Business' : 'Basic'} subscription is now active!`,
+          success: false,
+          message: 'Selected subscription package is currently unavailable.',
         };
       }
+      const purchaseRes = await rcWebInstance.purchase({ rcPackage: pkg });
+      const customerInfo = purchaseRes?.customerInfo;
+      const verifiedTier = mapCustomerInfoToTier(customerInfo);
+      if (verifiedTier !== targetTier && !(targetTier === 'basic' && verifiedTier === 'business')) {
+        return {
+          success: false,
+          message: 'Subscription payment was not confirmed. No plan changes were made.',
+        };
+      }
+      const txId =
+        purchaseRes?.StoreTransaction?.storeTransactionId ||
+        purchaseRes?.transaction?.transactionIdentifier ||
+        `rc_web_${initInfo.appUserId}_${Date.now()}`;
+
+      const serverCheck = await verifyReceiptWithBackend({
+        appUserId: initInfo.appUserId,
+        productId: targetProductId,
+        tier: verifiedTier,
+        transactionId: txId,
+        provider: initInfo.provider,
+      });
+
+      if (!serverCheck.verified) {
+        return {
+          success: false,
+          message: serverCheck.error || 'Could not verify subscription receipt with server.',
+        };
+      }
+
+      return {
+        success: true,
+        tier: verifiedTier,
+        transactionId: txId,
+        message: `Your ${verifiedTier === 'business' ? 'Business' : 'Basic'} subscription is now active!`,
+      };
     } catch (err: any) {
       if (err?.userCancelled) {
         return {
@@ -398,24 +457,18 @@ export async function purchaseSubscriptionTierWithRevenueCat(
           message: 'Purchase cancelled.',
         };
       }
+      return {
+        success: false,
+        message: err?.message || 'Subscription checkout failed due to a network or billing error.',
+      };
     }
   }
 
-  // 3. Server-Verified Sandbox Transaction (when testing in preview prior to native store binary upload)
-  const txId = `rc_sbx_${targetProductId}_${Date.now().toString(36)}`;
-  await notifyBackendReceiptVerified({
-    appUserId: initInfo.appUserId,
-    productId: targetProductId,
-    tier: targetTier,
-    transactionId: txId,
-    provider: initInfo.provider,
-  });
-
+  // Fail closed when no verified store billing session is active (prevents free upgrades on web or during network failures)
   return {
-    success: true,
-    tier: targetTier,
-    transactionId: txId,
-    message: `Your ${targetTier === 'business' ? 'Business' : 'Basic'} plan is now active!`,
+    success: false,
+    message:
+      'In-app purchases require the iOS App Store, Google Play Store, or an active billing session. Please complete your purchase in the mobile app or tap Restore Purchases if you already subscribed.',
   };
 }
 
@@ -425,6 +478,15 @@ export async function purchaseSubscriptionTierWithRevenueCat(
 export async function purchaseAiBoosterWithRevenueCat(
   coinsToAdd = 50
 ): Promise<PurchaseOutcome> {
+  // Strict Offline / Wi-Fi Disconnect Guard: never grant AI Booster Coins while offline
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return {
+      success: false,
+      message: 'Network connection unavailable. Please reconnect to Wi-Fi or cellular data to purchase AI Booster Coins.',
+    };
+  }
+
+  const safeCoinsToAdd = 50;
   const initInfo = await initializeRevenueCat();
   const productId = REVENUECAT_PRODUCT_IDS.AI_BOOSTER_50;
 
@@ -434,25 +496,50 @@ export async function purchaseAiBoosterWithRevenueCat(
         productIdentifiers: [productId],
         type: 'CONSUMABLE',
       });
-      if (products && products.length > 0) {
-        const res = await rcNativePurchases.purchaseStoreProduct({
-          product: products[0],
-        });
-        const txId = res?.transaction?.transactionIdentifier || `sk2_consumable_${Date.now()}`;
-        await notifyBackendReceiptVerified({
-          appUserId: initInfo.appUserId,
-          productId,
-          boosterCoinsAdded: coinsToAdd,
-          transactionId: txId,
-          provider: initInfo.provider,
-        });
+      if (!products || products.length === 0) {
         return {
-          success: true,
-          boosterCoinsAdded: coinsToAdd,
-          transactionId: txId,
-          message: `+${coinsToAdd} AI Quota Coins added to your balance (valid for 3 months)!`,
+          success: false,
+          message: 'AI Booster Pack product is currently unavailable from the store. Please check your connection.',
         };
       }
+
+      const res = await rcNativePurchases.purchaseStoreProduct({
+        product: products[0],
+      });
+      const txId = res?.transaction?.transactionIdentifier;
+      if (!txId) {
+        return {
+          success: false,
+          message: 'Store transaction receipt was not returned. No coins were added.',
+        };
+      }
+
+      const serverCheck = await verifyReceiptWithBackend({
+        appUserId: initInfo.appUserId,
+        productId,
+        boosterCoinsAdded: safeCoinsToAdd,
+        transactionId: txId,
+        provider: initInfo.provider,
+        isConsumable: true,
+      });
+
+      if (!serverCheck.verified || serverCheck.alreadyProcessed) {
+        return {
+          success: false,
+          message:
+            serverCheck.error ||
+            (serverCheck.alreadyProcessed
+              ? 'This purchase receipt has already been credited to your balance.'
+              : 'Receipt verification failed. Please check your internet connection.'),
+        };
+      }
+
+      return {
+        success: true,
+        boosterCoinsAdded: safeCoinsToAdd,
+        transactionId: txId,
+        message: `+${safeCoinsToAdd} AI Quota Coins added to your balance (valid for 3 months)!`,
+      };
     } catch (err: any) {
       if (err?.userCancelled || err?.code === '1') {
         return {
@@ -461,24 +548,81 @@ export async function purchaseAiBoosterWithRevenueCat(
           message: 'Booster pack purchase cancelled.',
         };
       }
-      throw new Error(err?.message || 'Purchase could not be completed.');
+      return {
+        success: false,
+        message: err?.message || 'Booster pack purchase could not be completed due to a network or store error.',
+      };
     }
   }
 
-  const txId = `rc_sbx_${productId}_${Date.now().toString(36)}`;
-  await notifyBackendReceiptVerified({
-    appUserId: initInfo.appUserId,
-    productId,
-    boosterCoinsAdded: coinsToAdd,
-    transactionId: txId,
-    provider: initInfo.provider,
-  });
+  if (rcWebInstance && typeof rcWebInstance.getOfferings === 'function') {
+    try {
+      const offerings = await rcWebInstance.getOfferings();
+      const pkgs: any[] = offerings?.current?.availablePackages || [];
+      const pkg = pkgs.find((p) => p.rcBillingProduct?.identifier === productId);
+      if (!pkg) {
+        return {
+          success: false,
+          message: 'AI Booster Pack is currently unavailable in web billing.',
+        };
+      }
+      const purchaseRes = await rcWebInstance.purchase({ rcPackage: pkg });
+      const txId =
+        purchaseRes?.StoreTransaction?.storeTransactionId ||
+        purchaseRes?.transaction?.transactionIdentifier;
+      if (!txId) {
+        return {
+          success: false,
+          message: 'Transaction receipt was not confirmed. No coins were added.',
+        };
+      }
 
+      const serverCheck = await verifyReceiptWithBackend({
+        appUserId: initInfo.appUserId,
+        productId,
+        boosterCoinsAdded: safeCoinsToAdd,
+        transactionId: txId,
+        provider: initInfo.provider,
+        isConsumable: true,
+      });
+
+      if (!serverCheck.verified || serverCheck.alreadyProcessed) {
+        return {
+          success: false,
+          message:
+            serverCheck.error ||
+            (serverCheck.alreadyProcessed
+              ? 'This purchase receipt has already been credited to your balance.'
+              : 'Could not verify booster purchase receipt with server.'),
+        };
+      }
+
+      return {
+        success: true,
+        boosterCoinsAdded: safeCoinsToAdd,
+        transactionId: txId,
+        message: `+${safeCoinsToAdd} AI Quota Coins added to your balance (valid for 3 months)!`,
+      };
+    } catch (err: any) {
+      if (err?.userCancelled) {
+        return {
+          success: false,
+          userCancelled: true,
+          message: 'Booster pack purchase cancelled.',
+        };
+      }
+      return {
+        success: false,
+        message: err?.message || 'Booster pack checkout failed due to a network or billing error.',
+      };
+    }
+  }
+
+  // Fail closed when no verified store billing session is active
   return {
-    success: true,
-    boosterCoinsAdded: coinsToAdd,
-    transactionId: txId,
-    message: `+${coinsToAdd} AI Quota Coins added to your balance (valid for 3 months)!`,
+    success: false,
+    message:
+      'Purchasing the +50 AI Booster Pack requires the iOS App Store, Google Play Store, or an active billing session.',
   };
 }
 
@@ -489,6 +633,14 @@ export async function purchaseAiBoosterWithRevenueCat(
 export async function restorePurchasesWithRevenueCat(
   currentLocalTier: SubscriptionTier
 ): Promise<PurchaseOutcome> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return {
+      success: false,
+      tier: currentLocalTier,
+      message: 'Network connection unavailable. Please reconnect to Wi-Fi or cellular data to restore purchases.',
+    };
+  }
+
   const initInfo = await initializeRevenueCat();
 
   // 1. Native Capacitor StoreKit 2 / Play Billing restorePurchases()
@@ -502,7 +654,11 @@ export async function restorePurchasesWithRevenueCat(
         message: `Your purchases have been restored (${restoredTier.toUpperCase()} plan active).`,
       };
     } catch (err: any) {
-      throw new Error(err?.message || 'Failed to restore purchases.');
+      return {
+        success: false,
+        tier: currentLocalTier,
+        message: err?.message || 'Failed to restore purchases from the store.',
+      };
     }
   }
 
@@ -513,16 +669,21 @@ export async function restorePurchasesWithRevenueCat(
     );
     if (res.ok) {
       const data = await res.json();
-      if (data.tier) {
+      const rawTier = String(data?.tier || '').toLowerCase();
+      if (rawTier === 'free' || rawTier === 'basic' || rawTier === 'business') {
         return {
           success: true,
-          tier: data.tier as SubscriptionTier,
-          message: `Your purchases have been restored (${String(data.tier).toUpperCase()} plan active).`,
+          tier: rawTier as SubscriptionTier,
+          message: `Your purchases have been restored (${rawTier.toUpperCase()} plan active).`,
         };
       }
     }
   } catch {
-    // fallback if offline
+    return {
+      success: false,
+      tier: currentLocalTier,
+      message: 'Could not reach the billing server to restore purchases. Please check your connection.',
+    };
   }
 
   return {
@@ -532,22 +693,37 @@ export async function restorePurchasesWithRevenueCat(
   };
 }
 
-async function notifyBackendReceiptVerified(payload: {
+async function verifyReceiptWithBackend(payload: {
   appUserId: string;
   productId: string;
   tier?: SubscriptionTier;
   boosterCoinsAdded?: number;
   transactionId: string;
   provider: string;
-}) {
+  isConsumable?: boolean;
+}): Promise<{ verified: boolean; alreadyProcessed?: boolean; error?: string }> {
   try {
-    await apiFetch('/api/billing/verify-receipt', {
+    const res = await apiFetch('/api/billing/verify-receipt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        verified: false,
+        error: data?.error || `Receipt verification failed (${res.status}).`,
+      };
+    }
+    return {
+      verified: Boolean(data?.verified),
+      alreadyProcessed: Boolean(data?.alreadyProcessed),
+    };
   } catch {
-    // Non-blocking if offline
+    return {
+      verified: false,
+      error: 'Network error while verifying transaction receipt.',
+    };
   }
 }
 

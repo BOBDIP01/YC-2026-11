@@ -154,7 +154,7 @@ export function getCurrentWeekMondayStr(): string {
 }
 
 export function getInitialSubscriptionState(
-  initialTier: SubscriptionTier = 'business'
+  initialTier: SubscriptionTier = 'free'
 ): SubscriptionState {
   const today = getTodayDateStr();
   const monday = getCurrentWeekMondayStr();
@@ -181,7 +181,25 @@ export function normalizeSubscriptionState(state: SubscriptionState): Subscripti
   const today = getTodayDateStr();
   const monday = getCurrentWeekMondayStr();
   const nowMs = Date.now();
-  let updated: SubscriptionState = { ...state };
+  const validTier: SubscriptionTier =
+    state?.tier === 'basic' || state?.tier === 'business' || state?.tier === 'free'
+      ? state.tier
+      : 'free';
+
+  let updated: SubscriptionState = {
+    ...state,
+    tier: validTier,
+    dailyCoinsUsed: Math.max(0, Math.floor(Number(state?.dailyCoinsUsed) || 0)),
+    weeklyRadarSessionsUsed: Math.max(0, Math.floor(Number(state?.weeklyRadarSessionsUsed) || 0)),
+    totalCoinsConsumedLifetime: Math.max(
+      0,
+      Math.floor(Number(state?.totalCoinsConsumedLifetime) || 0)
+    ),
+    boosterPacksPurchasedCount: Math.max(
+      0,
+      Math.floor(Number(state?.boosterPacksPurchasedCount) || 0)
+    ),
+  };
 
   // 1. Ensure monthly billing cycle dates exist; if monthly cycle renewed, reset without any cumulative rollover
   if (!updated.billingCycleStartDate || !updated.billingCycleRenewalDate) {
@@ -195,43 +213,58 @@ export function normalizeSubscriptionState(state: SubscriptionState): Subscripti
     updated.dailyCoinsUsed = 0;
   }
 
-  // 2. Daily quota is strictly non-cumulative (resets each day, never rolls over)
-  if (updated.dailyQuotaDate !== today) {
+  // 2. Daily quota is strictly non-cumulative (resets only when calendar day advances forward, preventing clock-rollback exploits)
+  if (!updated.dailyQuotaDate) {
+    updated.dailyQuotaDate = today;
+  } else if (today > updated.dailyQuotaDate) {
     updated.dailyQuotaDate = today;
     updated.dailyCoinsUsed = 0;
   }
 
-  // 3. Weekly P2P Radar counter reset (Monday)
-  if (updated.radarWeekStartDate !== monday) {
+  // 3. Weekly P2P Radar counter reset (resets only when week advances forward, preventing clock-rollback exploits)
+  if (!updated.radarWeekStartDate) {
+    updated.radarWeekStartDate = monday;
+  } else if (monday > updated.radarWeekStartDate) {
     updated.radarWeekStartDate = monday;
     updated.weeklyRadarSessionsUsed = 0;
     updated.activeRadarSessionDate = undefined;
   }
 
-  // 4. Enforce 3-Month Validity on AI Booster Packs
-  let activePacks: AiBoosterPackBatch[] = Array.isArray(updated.boosterPacks)
+  // 4. Enforce 3-Month Validity & Integrity Bounds on AI Booster Packs (never mint packs from raw balance)
+  const rawPacks: AiBoosterPackBatch[] = Array.isArray(updated.boosterPacks)
     ? updated.boosterPacks
     : [];
 
-  // Migrate legacy balance if boosterCoinsBalance > 0 without boosterPacks array
-  if (activePacks.length === 0 && (updated.boosterCoinsBalance || 0) > 0) {
-    const fallbackExpiry = updated.boosterExpiresAt || computeBoosterExpiryIso();
-    activePacks = [
-      {
-        id: `booster-legacy-${Date.now()}`,
-        purchasedAt: new Date().toISOString(),
-        expiresAt: fallbackExpiry,
-        initialCoins: updated.boosterCoinsBalance,
-        remainingCoins: updated.boosterCoinsBalance,
-      },
-    ];
-  }
+  const maxValidityWindowMs = (AI_BOOSTER_VALIDITY_DAYS + 5) * 86400000;
+  const seenPackIds = new Set<string>();
 
-  // Filter out expired booster packs (older than 3 months) or depleted packs
-  activePacks = activePacks
+  const activePacks: AiBoosterPackBatch[] = rawPacks
+    .map((pack) => {
+      const safeInitial = Math.min(
+        AI_BOOSTER_PACK_SIZE,
+        Math.max(1, Math.floor(Number(pack?.initialCoins) || AI_BOOSTER_PACK_SIZE))
+      );
+      const safeRemaining = Math.min(
+        safeInitial,
+        Math.max(0, Math.floor(Number(pack?.remainingCoins) || 0))
+      );
+      return {
+        ...pack,
+        initialCoins: safeInitial,
+        remainingCoins: safeRemaining,
+      };
+    })
     .filter((pack) => {
+      if (!pack?.id || seenPackIds.has(pack.id)) return false;
+      const purchasedMs = new Date(pack.purchasedAt).getTime();
       const expMs = new Date(pack.expiresAt).getTime();
-      return !Number.isNaN(expMs) && expMs > nowMs && pack.remainingCoins > 0;
+      if (Number.isNaN(purchasedMs) || Number.isNaN(expMs)) return false;
+      // Reject packs with forged expiry windows exceeding 3 months from purchase or future purchase dates
+      if (expMs - purchasedMs > maxValidityWindowMs) return false;
+      if (purchasedMs > nowMs + 86400000) return false;
+      if (expMs <= nowMs || pack.remainingCoins <= 0) return false;
+      seenPackIds.add(pack.id);
+      return true;
     })
     .sort((a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime());
 
@@ -453,6 +486,10 @@ export function purchaseAiBoosterPack(
   rawState: SubscriptionState,
   coinsToAdd = AI_BOOSTER_PACK_SIZE
 ): SubscriptionState {
+  const safeCoinsToAdd = Math.min(
+    AI_BOOSTER_PACK_SIZE,
+    Math.max(1, Math.floor(Number(coinsToAdd) || AI_BOOSTER_PACK_SIZE))
+  );
   const state = normalizeSubscriptionState(rawState);
   const now = new Date();
   const expiresAt = computeBoosterExpiryIso(now);
@@ -461,8 +498,8 @@ export function purchaseAiBoosterPack(
     id: `booster-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     purchasedAt: now.toISOString(),
     expiresAt,
-    initialCoins: coinsToAdd,
-    remainingCoins: coinsToAdd,
+    initialCoins: safeCoinsToAdd,
+    remainingCoins: safeCoinsToAdd,
   };
 
   const nextPacks = [...(state.boosterPacks || []), newBatch];
@@ -470,7 +507,7 @@ export function purchaseAiBoosterPack(
   return normalizeSubscriptionState({
     ...state,
     boosterPacks: nextPacks,
-    boosterCoinsBalance: (state.boosterCoinsBalance || 0) + coinsToAdd,
+    boosterCoinsBalance: (state.boosterCoinsBalance || 0) + safeCoinsToAdd,
     boosterPacksPurchasedCount: (state.boosterPacksPurchasedCount || 0) + 1,
     boosterExpiresAt: nextPacks[0].expiresAt,
   });

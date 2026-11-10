@@ -585,11 +585,16 @@ export default function App() {
       try {
         return normalizeSubscriptionState(JSON.parse(saved));
       } catch {
-        return getInitialSubscriptionState('business');
+        return getInitialSubscriptionState('free');
       }
     }
-    return getInitialSubscriptionState('business');
+    return getInitialSubscriptionState('free');
   });
+
+  const subscriptionRef = React.useRef<SubscriptionState>(subscription);
+  useEffect(() => {
+    subscriptionRef.current = subscription;
+  }, [subscription]);
 
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
 
@@ -713,27 +718,38 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [authUser?.uid, personas, cards, contacts, subscription]);
 
-  // Subscription & AI Quota Coin Handlers
+  // Subscription & AI Quota Coin Handlers (Synchronously serialized against subscriptionRef + persisted to disk before network call)
   const handleConsumeAiCoin = (usageType: AiUsageType, label: string): boolean => {
-    const result = consumeAiQuota(subscription, usageType, label);
+    const current = normalizeSubscriptionState(subscriptionRef.current);
+    const result = consumeAiQuota(current, usageType, label);
     if (!result.allowed) {
       return false;
     }
+    subscriptionRef.current = result.updated;
+    safeSetLocalStorage('youconnect_subscription_v1', JSON.stringify(result.updated));
     setSubscription(result.updated);
     return true;
   };
 
   const handleChangeTier = (newTier: SubscriptionTier) => {
-    setSubscription((prev) =>
-      normalizeSubscriptionState({
+    setSubscription((prev) => {
+      const next = normalizeSubscriptionState({
         ...prev,
         tier: newTier,
-      })
-    );
+      });
+      subscriptionRef.current = next;
+      safeSetLocalStorage('youconnect_subscription_v1', JSON.stringify(next));
+      return next;
+    });
   };
 
-  const handleBuyBoosterPack = () => {
-    setSubscription((prev) => purchaseAiBoosterPack(prev));
+  const handleBuyBoosterPack = (coinsToAdd?: number) => {
+    setSubscription((prev) => {
+      const next = purchaseAiBoosterPack(prev, coinsToAdd);
+      subscriptionRef.current = next;
+      safeSetLocalStorage('youconnect_subscription_v1', JSON.stringify(next));
+      return next;
+    });
   };
 
   // Handlers
@@ -1135,7 +1151,7 @@ export default function App() {
             subscription={subscription}
             onConsumeAiCoin={handleConsumeAiCoin}
             onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
-            onUpgradeToBusiness={() => handleChangeTier('business')}
+            onUpgradeToBusiness={() => setIsSubscriptionModalOpen(true)}
           />
         )}
 
@@ -1698,7 +1714,32 @@ export default function App() {
                             setContacts(cloudSnapshot.contacts);
                           }
                           if (cloudSnapshot.subscription) {
-                            setSubscription(normalizeSubscriptionState(cloudSnapshot.subscription));
+                            const localSub = normalizeSubscriptionState(subscriptionRef.current);
+                            const cloudSub = normalizeSubscriptionState(cloudSnapshot.subscription);
+                            const mergedSub = normalizeSubscriptionState({
+                              ...cloudSub,
+                              dailyCoinsUsed:
+                                cloudSub.dailyQuotaDate === localSub.dailyQuotaDate
+                                  ? Math.max(localSub.dailyCoinsUsed, cloudSub.dailyCoinsUsed)
+                                  : cloudSub.dailyCoinsUsed,
+                              weeklyRadarSessionsUsed:
+                                cloudSub.radarWeekStartDate === localSub.radarWeekStartDate
+                                  ? Math.max(
+                                      localSub.weeklyRadarSessionsUsed,
+                                      cloudSub.weeklyRadarSessionsUsed
+                                    )
+                                  : cloudSub.weeklyRadarSessionsUsed,
+                              totalCoinsConsumedLifetime: Math.max(
+                                localSub.totalCoinsConsumedLifetime || 0,
+                                cloudSub.totalCoinsConsumedLifetime || 0
+                              ),
+                            });
+                            subscriptionRef.current = mergedSub;
+                            safeSetLocalStorage(
+                              'youconnect_subscription_v1',
+                              JSON.stringify(mergedSub)
+                            );
+                            setSubscription(mergedSub);
                           }
                         } else {
                           let savedAcc: any = null;
