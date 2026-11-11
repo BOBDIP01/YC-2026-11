@@ -85,13 +85,6 @@ import {
   Coins,
   Award,
   Maximize2,
-  ZoomIn,
-  ZoomOut,
-  Move,
-  ArrowUp,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
 } from 'lucide-react';
 
 interface CardStudioProps {
@@ -313,95 +306,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
     }, 80);
   };
 
-  // Framing, Zoom & Pan State for the Image Hub
-  const [isDraggingFramingPreview, setIsDraggingFramingPreview] = useState(false);
-  const framingDragRef = useRef<{
-    active: boolean;
-    startX: number;
-    startY: number;
-    initialOffsetX: number;
-    initialOffsetY: number;
-  } | null>(null);
-
-  const handleFramingPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!profile.avatarUrl) return;
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-    framingDragRef.current = {
-      active: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      initialOffsetX: typeof activeCard.avatarOffsetX === 'number' ? activeCard.avatarOffsetX : 50,
-      initialOffsetY: typeof activeCard.avatarOffsetY === 'number' ? activeCard.avatarOffsetY : 18,
-    };
-    setIsDraggingFramingPreview(true);
-  };
-
-  const handleFramingPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!framingDragRef.current?.active) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const dx = e.clientX - framingDragRef.current.startX;
-    const dy = e.clientY - framingDragRef.current.startY;
-    const nextX = Math.max(0, Math.min(100, Math.round(framingDragRef.current.initialOffsetX - dx * 0.4)));
-    const nextY = Math.max(0, Math.min(100, Math.round(framingDragRef.current.initialOffsetY - dy * 0.4)));
-    onUpdateCard({
-      ...activeCard,
-      avatarOffsetX: nextX,
-      avatarOffsetY: nextY,
-    });
-  };
-
-  const handleFramingPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!framingDragRef.current) return;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-    framingDragRef.current = null;
-    setIsDraggingFramingPreview(false);
-  };
-
-  const handleSetZoom = (nextZoom: number) => {
-    const clamped = Math.max(1.0, Math.min(2.5, Math.round(nextZoom * 100) / 100));
-    onUpdateCard({
-      ...activeCard,
-      avatarZoom: clamped,
-    });
-  };
-
-  const handleStepZoom = (delta: number) => {
-    const currentZoom = typeof activeCard.avatarZoom === 'number' ? activeCard.avatarZoom : 1.0;
-    handleSetZoom(currentZoom + delta);
-  };
-
-  const handleNudgePan = (deltaX: number, deltaY: number) => {
-    const currentX = typeof activeCard.avatarOffsetX === 'number' ? activeCard.avatarOffsetX : 50;
-    const currentY = typeof activeCard.avatarOffsetY === 'number' ? activeCard.avatarOffsetY : 18;
-    const nextX = Math.max(0, Math.min(100, currentX + deltaX));
-    const nextY = Math.max(0, Math.min(100, currentY + deltaY));
-    onUpdateCard({
-      ...activeCard,
-      avatarOffsetX: nextX,
-      avatarOffsetY: nextY,
-    });
-  };
-
-  const handleResetFraming = () => {
-    onUpdateCard({
-      ...activeCard,
-      avatarZoom: 1.0,
-      avatarOffsetX: 50,
-      avatarOffsetY: 18,
-    });
-  };
-
   const [imageHubSubTab, setImageHubSubTab] = useState<'avatar' | 'background'>('avatar');
   const [paletteGroup, setPaletteGroup] = useState<'all' | 'signature' | 'metals'>('all');
   const [inlineBannerPrompt, setInlineBannerPrompt] = useState('');
@@ -568,7 +472,9 @@ export const CardStudio: React.FC<CardStudioProps> = ({
             if (
               serverData?.imageUrl &&
               serverData.imageUrl.startsWith('data:') &&
-              serverData.model === 'gemini-3.1-flash-lite-image'
+              !serverData.shouldClientEnhance &&
+              !serverData.isFallback &&
+              serverData.imageUrl !== activeSourcePortrait
             ) {
               finalHeadshotUrl = serverData.imageUrl;
             }
@@ -618,111 +524,70 @@ export const CardStudio: React.FC<CardStudioProps> = ({
 
     // Track B: 3D & Stylized Character Avatar Presets
     try {
-      const res = await apiFetch('/api/ai/avatar-3d', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inputImage: activeSourcePortrait,
-          name: profile.name,
-          role: profile.workData?.role || profile.role,
-          stylePreset: avatarStylePreset,
-          customCommand: avatarCustomCommand,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.imageUrl) {
-          const img = new window.Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = async () => {
-            const size = 640;
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            let finalAvatarUrl = data.imageUrl;
-            if (ctx) {
-              // Center-crop square
-              const minSide = Math.min(img.width, img.height);
-              const sx = (img.width - minSide) / 2;
-              const sy = (img.height - minSide) / 2;
-
-              if (data.shouldClientStylize) {
-                if (avatarStylePreset === 'comic_book') {
-                  ctx.filter = 'contrast(1.38) saturate(1.45) brightness(1.04)';
-                } else if (avatarStylePreset === 'cartoon') {
-                  ctx.filter = 'saturate(1.55) contrast(1.22) brightness(1.06)';
-                } else if (avatarStylePreset === 'manga') {
-                  ctx.filter = 'contrast(1.42) saturate(0.85) brightness(1.08)';
-                } else if (avatarStylePreset === 'cyberpunk') {
-                  ctx.filter = 'contrast(1.3) saturate(1.5) hue-rotate(-12deg)';
-                } else if (avatarStylePreset === 'pop_art') {
-                  ctx.filter = 'contrast(1.5) saturate(1.75)';
-                } else if (avatarStylePreset === 'oil_painting') {
-                  ctx.filter = 'contrast(1.18) saturate(1.28) sepia(0.18)';
-                } else {
-                  ctx.filter = 'contrast(1.16) saturate(1.22) brightness(1.04)';
-                }
-              }
-
-              ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
-              ctx.filter = 'none';
-
-              if (data.shouldClientStylize) {
-                const grad = ctx.createRadialGradient(size * 0.5, size * 0.35, size * 0.2, size * 0.5, size * 0.5, size * 0.72);
-                if (avatarStylePreset === 'cyberpunk') {
-                  grad.addColorStop(0, 'rgba(6, 182, 212, 0)');
-                  grad.addColorStop(1, 'rgba(217, 70, 239, 0.32)');
-                } else if (avatarStylePreset === 'comic_book' || avatarStylePreset === 'pop_art') {
-                  grad.addColorStop(0, 'rgba(250, 204, 21, 0)');
-                  grad.addColorStop(1, 'rgba(220, 38, 38, 0.26)');
-                } else if (avatarStylePreset === 'manga') {
-                  grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-                  grad.addColorStop(1, 'rgba(99, 102, 241, 0.25)');
-                } else {
-                  grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-                  grad.addColorStop(1, 'rgba(15, 23, 42, 0.28)');
-                }
-                ctx.fillStyle = grad;
-                ctx.fillRect(0, 0, size, size);
-              }
-
-              finalAvatarUrl = canvas.toDataURL('image/jpeg', 0.9);
-            }
-
-            const newAvatarEntry: StoredPicture = {
-              id: `pic-3d-${Date.now()}`,
-              name: `${chosenLabel}${avatarCustomCommand.trim() ? ` (${avatarCustomCommand.trim().slice(0, 18)})` : ''}`,
-              url: finalAvatarUrl,
-              context: 'custom',
-              aiStyle: avatarStylePreset,
-              isAiGenerated: true,
-              createdAt: new Date().toISOString(),
-            };
-
-            const existingPics = (profile.storedPictures || []).filter(
-              (p) => p.url !== finalAvatarUrl
-            );
-            onUpdateProfile({
-              ...profile,
-              previousAvatarUrl: activeSourcePortrait,
-              avatarUrl: finalAvatarUrl,
-              storedPictures: [newAvatarEntry, ...existingPics],
-            });
-            setAvatarCreationStatus(`Created "${newAvatarEntry.name}" from your active portrait and saved to your Image Hub Vault.`);
-            setIsRecreating3DAvatar(false);
-          };
-          img.onerror = () => {
-            setIsRecreating3DAvatar(false);
-          };
-          img.src = data.imageUrl;
-          return;
+      let finalAvatarUrl: string | null = null;
+      try {
+        const res = await apiFetch('/api/ai/avatar-3d', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inputImage: activeSourcePortrait,
+            name: profile.name,
+            role: profile.workData?.role || profile.role,
+            stylePreset: avatarStylePreset,
+            customCommand: avatarCustomCommand,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (
+            data?.imageUrl &&
+            data.imageUrl.startsWith('data:') &&
+            !data.shouldClientStylize &&
+            !data.isFallback &&
+            data.imageUrl !== activeSourcePortrait
+          ) {
+            finalAvatarUrl = data.imageUrl;
+          }
         }
+      } catch (err) {
+        console.warn('3D Avatar creation server notice:', err);
       }
+
+      if (!finalAvatarUrl) {
+        finalAvatarUrl = await enhancePhotoWithAI({
+          imageUrl: activeSourcePortrait,
+          style: avatarStylePreset as any,
+          prompt: avatarCustomCommand,
+        });
+      }
+
+      const newAvatarEntry: StoredPicture = {
+        id: `pic-3d-${Date.now()}`,
+        name: `${chosenLabel}${avatarCustomCommand.trim() ? ` (${avatarCustomCommand.trim().slice(0, 18)})` : ''}`,
+        url: finalAvatarUrl,
+        context: 'custom',
+        aiStyle: avatarStylePreset,
+        isAiGenerated: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      const existingPics = (profile.storedPictures || []).filter(
+        (p) => p.url !== finalAvatarUrl
+      );
+      onUpdateProfile({
+        ...profile,
+        previousAvatarUrl: activeSourcePortrait,
+        avatarUrl: finalAvatarUrl,
+        storedPictures: [newAvatarEntry, ...existingPics],
+      });
+      setAvatarCreationStatus(
+        `Applied "${newAvatarEntry.name}" to your active portrait and saved to your Image Hub Vault.`
+      );
     } catch (err) {
       console.warn('3D Avatar creation notice:', err);
+    } finally {
+      setIsRecreating3DAvatar(false);
     }
-    setIsRecreating3DAvatar(false);
   };
 
   // Brand Logo Upload & AI Generator Handlers (for Card Theme & Style -> Brand & Media)
@@ -1563,7 +1428,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
               onUpdateCard={onUpdateCard}
               onAddContactToCRM={onAddContactToCRM}
               interactive={true}
-              onOpenImageHub={handleOpenImageHub}
             />
           </div>
 
@@ -2552,228 +2416,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                           </div>
                         </div>
                       )}
-                    </div>
-
-                    {/* INTERACTIVE PORTRAIT FRAMING, ZOOM & PAN STUDIO */}
-                    <div className="rounded-xl border border-cyan-500/35 bg-slate-950/90 p-4 space-y-4 shadow-xl">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
-                            <Move className="h-4 w-4 text-cyan-400" />
-                          </div>
-                          <div>
-                            <h5 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                              Portrait Framing & Pan / Zoom Studio
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-500/30">
-                                Live 3D Sync
-                              </span>
-                            </h5>
-                            <p className="text-[11px] text-slate-400">
-                              Drag the portrait to pan, or use the zoom slider and nudge buttons to frame your photo perfectly on your cards.
-                            </p>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={handleResetFraming}
-                          title="Reset portrait framing to golden center ratio"
-                          className="h-8 px-2.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold inline-flex items-center gap-1.5 transition shrink-0"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5 text-amber-400" />
-                          <span>Reset Center</span>
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
-                        {/* Left (md:col-span-5): Interactive Drag-to-Pan Canvas Preview */}
-                        <div className="flex flex-col items-center justify-center space-y-2">
-                          <div
-                            onPointerDown={handleFramingPointerDown}
-                            onPointerMove={handleFramingPointerMove}
-                            onPointerUp={handleFramingPointerUp}
-                            onPointerCancel={handleFramingPointerUp}
-                            className={`relative w-44 h-44 sm:w-48 sm:h-48 rounded-2xl overflow-hidden border-2 select-none shadow-2xl transition-all ${
-                              isDraggingFramingPreview
-                                ? 'border-cyan-400 ring-4 ring-cyan-500/30 cursor-grabbing'
-                                : 'border-cyan-500/40 hover:border-cyan-400 cursor-grab'
-                            } bg-slate-900`}
-                            style={{ touchAction: 'none' }}
-                            title="Click and drag anywhere to pan the portrait"
-                          >
-                            {profile.avatarUrl ? (
-                              <>
-                                <img
-                                  src={profile.avatarUrl}
-                                  alt={profile.name}
-                                  draggable={false}
-                                  className="w-full h-full object-cover pointer-events-none select-none transition-transform duration-75"
-                                  style={{
-                                    objectPosition: `${activeCard.avatarOffsetX ?? 50}% ${activeCard.avatarOffsetY ?? 18}%`,
-                                    transform: (activeCard.avatarZoom ?? 1) !== 1 ? `scale(${activeCard.avatarZoom})` : undefined,
-                                    transformOrigin: `${activeCard.avatarOffsetX ?? 50}% ${activeCard.avatarOffsetY ?? 18}%`,
-                                  }}
-                                />
-                                {/* Subtle Pan & Zoom Crosshair Overlay */}
-                                <div className="absolute inset-0 border border-white/10 rounded-2xl pointer-events-none" />
-                                <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-slate-950/85 backdrop-blur-md border border-slate-800 text-[10px] font-mono text-cyan-300 flex items-center gap-1 pointer-events-none shadow">
-                                  <Move className="h-2.5 w-2.5" />
-                                  <span>Pan {activeCard.avatarOffsetX ?? 50}%, {activeCard.avatarOffsetY ?? 18}%</span>
-                                </div>
-                                <div className="absolute bottom-2 inset-x-2 py-1 rounded-md bg-slate-950/85 backdrop-blur-md border border-slate-800 text-[10px] font-mono text-center text-slate-300 pointer-events-none shadow">
-                                  {(activeCard.avatarZoom ?? 1).toFixed(2)}x Zoom · Drag to pan
-                                </div>
-                              </>
-                            ) : (
-                              <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-slate-400">
-                                <Camera className="h-8 w-8 text-slate-500 mb-2" />
-                                <span className="text-xs">Upload a portrait above to enable framing</span>
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-slate-400 text-center">
-                            💡 Drag inside the square above to freely pan your photo
-                          </span>
-                        </div>
-
-                        {/* Right (md:col-span-7): Zoom Slider & Precise Directional Pan D-Pad */}
-                        <div className="space-y-4">
-                          {/* Zoom Control Section */}
-                          <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 p-3.5 space-y-2.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                                <ZoomIn className="h-3.5 w-3.5 text-cyan-400" />
-                                <span>Zoom Level</span>
-                              </span>
-                              <span className="font-mono text-cyan-300 font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800">
-                                {(activeCard.avatarZoom ?? 1.0).toFixed(2)}x
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={() => handleStepZoom(-0.1)}
-                                disabled={(activeCard.avatarZoom ?? 1.0) <= 1.0}
-                                className="h-8 w-8 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center transition shrink-0"
-                                title="Zoom Out"
-                              >
-                                <ZoomOut className="h-4 w-4" />
-                              </button>
-                              <input
-                                type="range"
-                                min={1.0}
-                                max={2.5}
-                                step={0.05}
-                                value={activeCard.avatarZoom ?? 1.0}
-                                onChange={(e) => handleSetZoom(parseFloat(e.target.value))}
-                                className="flex-1 accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleStepZoom(0.1)}
-                                disabled={(activeCard.avatarZoom ?? 1.0) >= 2.5}
-                                className="h-8 w-8 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 flex items-center justify-center transition shrink-0"
-                                title="Zoom In"
-                              >
-                                <ZoomIn className="h-4 w-4" />
-                              </button>
-                            </div>
-
-                            {/* Quick Zoom Presets */}
-                            <div className="grid grid-cols-4 gap-1.5 pt-1">
-                              {[
-                                { label: '1.0x Fit', value: 1.0 },
-                                { label: '1.25x Close', value: 1.25 },
-                                { label: '1.50x Bust', value: 1.5 },
-                                { label: '2.0x Focus', value: 2.0 },
-                              ].map((preset) => (
-                                <button
-                                  key={preset.value}
-                                  type="button"
-                                  onClick={() => handleSetZoom(preset.value)}
-                                  className={`py-1 px-1 rounded-lg text-[10px] font-mono font-medium transition ${
-                                    Math.abs((activeCard.avatarZoom ?? 1.0) - preset.value) < 0.04
-                                      ? 'bg-cyan-600 text-white font-bold shadow'
-                                      : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300'
-                                  }`}
-                                >
-                                  {preset.label}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Directional Pan Nudge Controls */}
-                          <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 p-3.5 space-y-2.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                                <Move className="h-3.5 w-3.5 text-cyan-400" />
-                                <span>Directional Pan & Fine Tuning</span>
-                              </span>
-                              <span className="text-[11px] font-mono text-slate-400">
-                                X: {activeCard.avatarOffsetX ?? 50}% · Y: {activeCard.avatarOffsetY ?? 18}%
-                              </span>
-                            </div>
-
-                            <div className="flex items-center justify-center gap-2">
-                              {/* D-Pad Buttons */}
-                              <div className="inline-grid grid-cols-3 gap-1.5 p-1.5 bg-slate-950 rounded-xl border border-slate-800">
-                                <div />
-                                <button
-                                  type="button"
-                                  onClick={() => handleNudgePan(0, -5)}
-                                  className="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition active:scale-95"
-                                  title="Pan Up (nudges down into frame)"
-                                >
-                                  <ArrowUp className="h-4 w-4" />
-                                </button>
-                                <div />
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleNudgePan(5, 0)}
-                                  className="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition active:scale-95"
-                                  title="Pan Left"
-                                >
-                                  <ArrowLeft className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleResetFraming}
-                                  className="h-8 w-8 rounded-lg bg-indigo-950 hover:bg-indigo-900 text-indigo-300 flex items-center justify-center transition active:scale-95"
-                                  title="Center & Reset"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5 text-indigo-400" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleNudgePan(-5, 0)}
-                                  className="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition active:scale-95"
-                                  title="Pan Right"
-                                >
-                                  <ArrowRight className="h-4 w-4" />
-                                </button>
-
-                                <div />
-                                <button
-                                  type="button"
-                                  onClick={() => handleNudgePan(0, 5)}
-                                  className="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center transition active:scale-95"
-                                  title="Pan Down (nudges up into frame)"
-                                >
-                                  <ArrowDown className="h-4 w-4" />
-                                </button>
-                                <div />
-                              </div>
-
-                              <div className="text-[11px] text-slate-400 leading-snug pl-2 max-w-[180px]">
-                                Use arrows to fine-tune portrait positioning by 5% increments.
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
                     </div>
 
                     {/* Bottom Area: Presets that populate the AI Description Field above */}

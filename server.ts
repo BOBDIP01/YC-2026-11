@@ -789,34 +789,38 @@ Lighting: professional diffused studio key light, crisp focus, centered 1:1 squa
         parts.push({ text: fullPrompt });
 
         let response: any = null;
-        let modelUsed = 'gemini-3.1-flash-lite-image';
+        let modelUsed = 'imagen-3.0-generate-002';
 
         try {
-          response = await aiClient.models.generateContent({
-            model: 'gemini-3.1-flash-lite-image',
-            contents: { parts },
+          const imgResult = await aiClient.models.generateImages({
+            model: 'imagen-3.0-generate-002',
+            prompt: fullPrompt,
             config: {
-              imageConfig: {
-                aspectRatio: '1:1',
-              },
+              numberOfImages: 1,
+              aspectRatio: '1:1',
+              outputMimeType: 'image/jpeg',
             },
           });
-        } catch (liteErr: any) {
-          console.warn('gemini-3.1-flash-lite-image note:', liteErr.message);
-          try {
-            modelUsed = 'gemini-nano-banana-2.1';
-            response = await aiClient.models.generateContent({
-              model: 'gemini-nano-banana-2.1',
-              contents: { parts },
-              config: {
-                imageConfig: {
-                  aspectRatio: '1:1',
-                },
-              },
+          if (imgResult?.generatedImages?.[0]?.image?.imageBytes) {
+            return res.json({
+              imageUrl: `data:image/jpeg;base64,${imgResult.generatedImages[0].image.imageBytes}`,
+              name: `${styleLabel} AI Portrait of ${name}`,
+              model: modelUsed,
+              isAiModified: true,
+              preservedLikeness: true,
             });
-          } catch (bananaErr: any) {
-            console.warn('gemini-nano-banana-2.1 note:', bananaErr.message);
-            throw bananaErr;
+          }
+        } catch (imgErr: any) {
+          console.warn('imagen-3.0-generate-002 note:', imgErr.message);
+          try {
+            modelUsed = 'gemini-2.0-flash';
+            response = await aiClient.models.generateContent({
+              model: 'gemini-2.0-flash',
+              contents: { parts },
+            });
+          } catch (flashErr: any) {
+            console.warn('gemini-2.0-flash note:', flashErr.message);
+            throw flashErr;
           }
         }
 
@@ -861,6 +865,7 @@ Lighting: professional diffused studio key light, crisp focus, centered 1:1 squa
       isAiModified: true,
       preservedLikeness: true,
       shouldClientEnhance: true,
+      isFallback: true,
       quotaNotice,
     });
   } catch (error: any) {
@@ -947,28 +952,38 @@ ${cleanCustom ? `3. Additional User Style Command: "${cleanCustom}".` : ''}
         parts.push({ text: prompt3D });
 
         let response: any = null;
-        let modelUsed = 'gemini-3.1-flash-lite-image';
+        let modelUsed = 'imagen-3.0-generate-002';
         try {
-          response = await aiClient.models.generateContent({
-            model: 'gemini-3.1-flash-lite-image',
-            contents: { parts },
+          const imgResult = await aiClient.models.generateImages({
+            model: 'imagen-3.0-generate-002',
+            prompt: prompt3D,
             config: {
-              imageConfig: {
-                aspectRatio: '1:1',
-              },
+              numberOfImages: 1,
+              aspectRatio: '1:1',
+              outputMimeType: 'image/jpeg',
             },
           });
-        } catch {
-          modelUsed = 'gemini-nano-banana-2.1';
-          response = await aiClient.models.generateContent({
-            model: 'gemini-nano-banana-2.1',
-            contents: { parts },
-            config: {
-              imageConfig: {
-                aspectRatio: '1:1',
-              },
-            },
-          });
+          if (imgResult?.generatedImages?.[0]?.image?.imageBytes) {
+            return res.json({
+              imageUrl: `data:image/jpeg;base64,${imgResult.generatedImages[0].image.imageBytes}`,
+              name: `${chosenPreset.label} — ${name}`,
+              model: modelUsed,
+              stylePreset,
+              recreated3D: true,
+            });
+          }
+        } catch (imgErr: any) {
+          console.warn('imagen-3.0-generate-002 note:', imgErr.message);
+          try {
+            modelUsed = 'gemini-2.0-flash';
+            response = await aiClient.models.generateContent({
+              model: 'gemini-2.0-flash',
+              contents: { parts },
+            });
+          } catch (flashErr: any) {
+            console.warn('gemini-2.0-flash note:', flashErr.message);
+            throw flashErr;
+          }
         }
 
         if (response?.candidates?.[0]?.content?.parts) {
@@ -996,6 +1011,7 @@ ${cleanCustom ? `3. Additional User Style Command: "${cleanCustom}".` : ''}
       model: '3d-stylized-studio-shader',
       stylePreset,
       shouldClientStylize: true,
+      isFallback: true,
       recreated3D: true,
     });
   } catch (error: any) {
@@ -1035,30 +1051,37 @@ app.post('/api/ai/banner', async (req, res) => {
     if (aiClient) {
       try {
         let response: any = null;
-        let modelUsed = 'gemini-3.1-flash-lite-image';
+        let modelUsed = 'imagen-3.0-generate-002';
 
         try {
-          response = await aiClient.models.generateContent({
-            model: 'gemini-3.1-flash-lite-image',
-            contents: { parts: [{ text: fullPrompt }] },
+          const imgResult = await aiClient.models.generateImages({
+            model: 'imagen-3.0-generate-002',
+            prompt: fullPrompt,
             config: {
-              imageConfig: {
-                aspectRatio: '16:9',
-              },
+              numberOfImages: 1,
+              aspectRatio: '16:9',
+              outputMimeType: 'image/jpeg',
             },
           });
-        } catch (liteErr: any) {
-          console.warn('Banner lite image model note:', liteErr.message);
-          modelUsed = 'gemini-nano-banana-2.1';
-          response = await aiClient.models.generateContent({
-            model: 'gemini-nano-banana-2.1',
-            contents: { parts: [{ text: fullPrompt }] },
-            config: {
-              imageConfig: {
-                aspectRatio: '16:9',
-              },
-            },
-          });
+          if (imgResult?.generatedImages?.[0]?.image?.imageBytes) {
+            return res.json({
+              imageUrl: `data:image/jpeg;base64,${imgResult.generatedImages[0].image.imageBytes}`,
+              name: `Backdrop Banner — ${name}`,
+              model: modelUsed,
+              style,
+            });
+          }
+        } catch (imgErr: any) {
+          console.warn('imagen-3.0-generate-002 banner note:', imgErr.message);
+          try {
+            modelUsed = 'gemini-2.0-flash';
+            response = await aiClient.models.generateContent({
+              model: 'gemini-2.0-flash',
+              contents: { parts: [{ text: fullPrompt }] },
+            });
+          } catch (flashErr: any) {
+            console.warn('gemini-2.0-flash banner note:', flashErr.message);
+          }
         }
 
         if (response?.candidates?.[0]?.content?.parts) {
@@ -1151,28 +1174,36 @@ app.post('/api/ai/logo', async (req, res) => {
     if (aiClient) {
       try {
         let response: any = null;
-        let modelUsed = 'gemini-3.1-flash-lite-image';
+        let modelUsed = 'imagen-3.0-generate-002';
         try {
-          response = await aiClient.models.generateContent({
-            model: 'gemini-3.1-flash-lite-image',
-            contents: { parts: [{ text: fullLogoPrompt }] },
+          const imgResult = await aiClient.models.generateImages({
+            model: 'imagen-3.0-generate-002',
+            prompt: fullLogoPrompt,
             config: {
-              imageConfig: {
-                aspectRatio: '1:1',
-              },
+              numberOfImages: 1,
+              aspectRatio: '1:1',
+              outputMimeType: 'image/jpeg',
             },
           });
-        } catch {
-          modelUsed = 'gemini-nano-banana-2.1';
-          response = await aiClient.models.generateContent({
-            model: 'gemini-nano-banana-2.1',
-            contents: { parts: [{ text: fullLogoPrompt }] },
-            config: {
-              imageConfig: {
-                aspectRatio: '1:1',
-              },
-            },
-          });
+          if (imgResult?.generatedImages?.[0]?.image?.imageBytes) {
+            return res.json({
+              imageUrl: `data:image/jpeg;base64,${imgResult.generatedImages[0].image.imageBytes}`,
+              name: `Brand Logo for ${cleanCompany}`,
+              model: modelUsed,
+              style,
+            });
+          }
+        } catch (imgErr: any) {
+          console.warn('imagen-3.0-generate-002 logo note:', imgErr.message);
+          try {
+            modelUsed = 'gemini-2.0-flash';
+            response = await aiClient.models.generateContent({
+              model: 'gemini-2.0-flash',
+              contents: { parts: [{ text: fullLogoPrompt }] },
+            });
+          } catch (flashErr: any) {
+            console.warn('gemini-2.0-flash logo note:', flashErr.message);
+          }
         }
 
         if (response?.candidates?.[0]?.content?.parts) {

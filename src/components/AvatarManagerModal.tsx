@@ -513,7 +513,13 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
       }
 
       // If Gemini returned a generated image with facial consistency
-      if (serverData?.imageUrl && serverData.imageUrl.startsWith('data:') && serverData.model === 'gemini-3.1-flash-lite-image') {
+      if (
+        serverData?.imageUrl &&
+        serverData.imageUrl.startsWith('data:') &&
+        !serverData.shouldClientEnhance &&
+        !serverData.isFallback &&
+        serverData.imageUrl !== sourceImg
+      ) {
         setGeneratedPreview({
           url: serverData.imageUrl,
           name: serverData.name || `${activeStyleDisplayLabel} Gemini Portrait (${profile.name})`,

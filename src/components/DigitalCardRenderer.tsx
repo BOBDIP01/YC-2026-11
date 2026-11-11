@@ -53,8 +53,6 @@ import {
   Palette,
   Trophy,
   Heart,
-  ZoomIn,
-  ZoomOut,
   RotateCcw,
   User,
 } from 'lucide-react';
@@ -70,7 +68,6 @@ interface DigitalCardRendererProps {
   onSelectTheme?: (theme: CardTheme) => void;
   showRecipientActions?: boolean;
   recipientMode?: boolean;
-  onOpenImageHub?: (section?: 'portrait' | 'background') => void;
 }
 
 export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
@@ -82,7 +79,6 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
   initialLayout = 'card_3d',
   showRecipientActions = false,
   recipientMode = false,
-  onOpenImageHub,
 }) => {
   // Support card-level identity overrides (populated from Identity Settings on card creation, editable per card)
   const resolvedHolderName =
@@ -817,184 +813,29 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
   const avatarOffsetY = typeof card.avatarOffsetY === 'number' ? card.avatarOffsetY : 18;
   const avatarZoom = typeof card.avatarZoom === 'number' ? card.avatarZoom : 1;
 
-  const portraitDragRef = useRef<{
-    active: boolean;
-    startX: number;
-    startY: number;
-    initialOffsetX: number;
-    initialOffsetY: number;
-  } | null>(null);
-  const [isDraggingPortrait, setIsDraggingPortrait] = useState(false);
-
-  const handlePortraitPointerDown = (e: React.PointerEvent<HTMLElement>) => {
-    if (!onUpdateCard) return;
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    portraitDragRef.current = {
-      active: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      initialOffsetX: avatarOffsetX,
-      initialOffsetY: avatarOffsetY,
-    };
-    setIsDraggingPortrait(true);
-  };
-
-  const handlePortraitPointerMove = (e: React.PointerEvent<HTMLElement>) => {
-    if (!portraitDragRef.current?.active || !onUpdateCard) return;
-    e.stopPropagation();
-    const dx = e.clientX - portraitDragRef.current.startX;
-    const dy = e.clientY - portraitDragRef.current.startY;
-    // Dragging the image down moves object-position Y toward 0% (top of image); dragging right moves X toward 0% (left of image)
-    const nextX = Math.max(0, Math.min(100, Math.round(portraitDragRef.current.initialOffsetX - dx * 0.75)));
-    const nextY = Math.max(0, Math.min(100, Math.round(portraitDragRef.current.initialOffsetY - dy * 0.75)));
-    onUpdateCard({
-      ...card,
-      avatarOffsetX: nextX,
-      avatarOffsetY: nextY,
-    });
-  };
-
-  const handlePortraitPointerUp = (e: React.PointerEvent<HTMLElement>) => {
-    if (!portraitDragRef.current?.active) return;
-    e.stopPropagation();
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-    portraitDragRef.current = null;
-    setIsDraggingPortrait(false);
-  };
-
-  const handleAdjustPortraitZoom = (e: React.MouseEvent | React.PointerEvent, delta: number) => {
-    e.stopPropagation();
-    if (!onUpdateCard) return;
-    const nextZoom = Math.max(1, Math.min(2.4, Math.round((avatarZoom + delta) * 20) / 20));
-    onUpdateCard({
-      ...card,
-      avatarZoom: nextZoom,
-    });
-  };
-
-  const handleResetPortraitFraming = (e: React.MouseEvent | React.PointerEvent) => {
-    e.stopPropagation();
-    if (!onUpdateCard) return;
-    onUpdateCard({
-      ...card,
-      avatarOffsetX: 50,
-      avatarOffsetY: 18,
-      avatarZoom: 1,
-    });
-  };
-
-  const renderFloatingZoomControls = () => {
-    if (!onUpdateCard && !onOpenImageHub) return null;
-    if (onOpenImageHub) {
-      return (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenImageHub('portrait');
-          }}
-          title="Open Image Hub to Zoom & Pan Portrait"
-          className="absolute inset-x-1 bottom-1 z-30 flex items-center justify-center gap-1 rounded-lg bg-slate-950/90 hover:bg-indigo-950/95 border border-cyan-500/50 hover:border-indigo-400 px-1.5 py-0.5 shadow-lg backdrop-blur-md transition-all group/btn cursor-pointer"
-        >
-          <ZoomIn className="h-2.5 w-2.5 text-cyan-400 group-hover/btn:text-indigo-300" />
-          <span className="text-[8px] font-mono font-semibold text-cyan-200 group-hover/btn:text-white">
-            {avatarZoom.toFixed(1)}x · Image Hub
-          </span>
-        </button>
-      );
-    }
-    return (
-      <div
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
-        className={`absolute inset-x-1 bottom-1 z-30 flex items-center justify-center gap-0.5 rounded-lg bg-slate-950/90 border border-cyan-500/40 px-1 py-0.5 shadow-lg backdrop-blur-md transition-opacity duration-150 ${
-          isDraggingPortrait
-            ? 'opacity-100'
-            : 'opacity-0 group-hover/portrait:opacity-100'
-        }`}
-      >
-        <button
-          type="button"
-          onClick={(e) => handleAdjustPortraitZoom(e, -0.15)}
-          title="Zoom Out"
-          className="p-0.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
-        >
-          <ZoomOut className="h-2.5 w-2.5" />
-        </button>
-        <span className="text-[8px] font-mono text-cyan-300 px-0.5 select-none">
-          {avatarZoom.toFixed(1)}x
-        </span>
-        <button
-          type="button"
-          onClick={(e) => handleAdjustPortraitZoom(e, 0.15)}
-          title="Zoom In"
-          className="p-0.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white transition"
-        >
-          <ZoomIn className="h-2.5 w-2.5" />
-        </button>
-        {(avatarZoom !== 1 || avatarOffsetX !== 50 || avatarOffsetY !== 18) && (
-          <button
-            type="button"
-            onClick={handleResetPortraitFraming}
-            title="Reset Framing"
-            className="p-0.5 rounded hover:bg-slate-800 text-amber-300 hover:text-amber-200 transition"
-          >
-            <RotateCcw className="h-2.5 w-2.5" />
-          </button>
-        )}
-      </div>
-    );
-  };
-
   const renderFramedPortrait = (
     frameClassName: string,
     extraFrameStyle?: React.CSSProperties,
     badgeElement?: React.ReactNode
   ) => {
-    const canDrag = Boolean(onUpdateCard) && !onOpenImageHub;
     return (
       <div
-        onClick={(e) => {
-          if (onOpenImageHub) {
-            e.stopPropagation();
-            onOpenImageHub('portrait');
-          } else if (canDrag) {
-            e.stopPropagation();
-          }
-        }}
-        onPointerDown={canDrag ? handlePortraitPointerDown : undefined}
-        onPointerMove={canDrag ? handlePortraitPointerMove : undefined}
-        onPointerUp={canDrag ? handlePortraitPointerUp : undefined}
-        onPointerCancel={canDrag ? handlePortraitPointerUp : undefined}
-        className={`group/portrait relative overflow-hidden select-none ${frameClassName} ${
-          canDrag ? (isDraggingPortrait ? 'cursor-grabbing ring-2 ring-cyan-400' : 'cursor-grab') : (onOpenImageHub ? 'cursor-pointer' : '')
-        }`}
-        style={{
-          touchAction: canDrag && isDraggingPortrait ? 'none' : 'pan-y',
-          ...extraFrameStyle,
-        }}
-        title={onOpenImageHub ? 'Click to open Image Hub (Zoom & Pan Portrait)' : (canDrag ? 'Click and hold to drag portrait position · Use zoom controls below' : profile.name)}
+        className={`group/portrait relative overflow-hidden select-none ${frameClassName}`}
+        style={extraFrameStyle}
+        title={profile.name}
       >
         {profile.avatarUrl ? (
-          <>
-            <img
-              src={profile.avatarUrl}
-              alt={profile.name}
-              draggable={false}
-              className="w-full h-full object-cover pointer-events-none transition-transform duration-75"
-              style={{
-                objectPosition: `${avatarOffsetX}% ${avatarOffsetY}%`,
-                transform: avatarZoom !== 1 ? `scale(${avatarZoom})` : undefined,
-                transformOrigin: `${avatarOffsetX}% ${avatarOffsetY}%`,
-              }}
-            />
-            {renderFloatingZoomControls()}
-          </>
+          <img
+            src={profile.avatarUrl}
+            alt={profile.name}
+            draggable={false}
+            className="w-full h-full object-cover pointer-events-none transition-transform duration-75"
+            style={{
+              objectPosition: `${avatarOffsetX}% ${avatarOffsetY}%`,
+              transform: avatarZoom !== 1 ? `scale(${avatarZoom})` : undefined,
+              transformOrigin: `${avatarOffsetX}% ${avatarOffsetY}%`,
+            }}
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-950/90 via-slate-900 to-slate-950 text-indigo-200 font-bold select-none pointer-events-none">
             <span className="text-lg sm:text-xl tracking-wider uppercase">
@@ -1650,39 +1491,21 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                   >
                     {/* Frameless 3D Photorealistic Person Silhouette standing cleanly in front of the 3D stage */}
                     <div
-                      onClick={(e) => {
-                        if (onOpenImageHub) {
-                          e.stopPropagation();
-                          onOpenImageHub('portrait');
-                        } else if (onUpdateCard) {
-                          e.stopPropagation();
-                        }
-                      }}
-                      onPointerDown={!onOpenImageHub && onUpdateCard ? handlePortraitPointerDown : undefined}
-                      onPointerMove={!onOpenImageHub && onUpdateCard ? handlePortraitPointerMove : undefined}
-                      onPointerUp={!onOpenImageHub && onUpdateCard ? handlePortraitPointerUp : undefined}
-                      onPointerCancel={!onOpenImageHub && onUpdateCard ? handlePortraitPointerUp : undefined}
-                      style={{ touchAction: !onOpenImageHub && onUpdateCard ? 'none' : undefined }}
-                      title={onOpenImageHub ? 'Click to open Image Hub (Zoom & Pan Portrait)' : (onUpdateCard ? 'Drag to position 3D silhouette subject' : profile.name)}
-                      className={`group/portrait relative shrink-0 flex items-end justify-center w-24 sm:w-28 h-28 sm:h-32 -mb-0.5 overflow-hidden ${
-                        onOpenImageHub ? 'cursor-pointer' : (onUpdateCard ? (isDraggingPortrait ? 'cursor-grabbing' : 'cursor-grab') : '')
-                      }`}
+                      className="group/portrait relative shrink-0 flex items-end justify-center w-24 sm:w-28 h-28 sm:h-32 -mb-0.5 overflow-hidden"
+                      title={profile.name}
                     >
                       {silhouetteCutoutUrl || profile.avatarUrl ? (
-                        <>
-                          <img
-                            src={silhouetteCutoutUrl || profile.avatarUrl}
-                            alt={profile.name}
-                            draggable={false}
-                            className="relative z-10 w-full h-full object-contain object-bottom select-none pointer-events-none transition-transform duration-75"
-                            style={{
-                              objectPosition: `${avatarOffsetX}% ${avatarOffsetY}%`,
-                              transform: `translate(${(50 - avatarOffsetX) * 0.35}%, ${(18 - avatarOffsetY) * 0.35}%) scale(${avatarZoom})`,
-                              transformOrigin: 'center bottom',
-                            }}
-                          />
-                          {renderFloatingZoomControls()}
-                        </>
+                        <img
+                          src={silhouetteCutoutUrl || profile.avatarUrl}
+                          alt={profile.name}
+                          draggable={false}
+                          className="relative z-10 w-full h-full object-contain object-bottom select-none pointer-events-none transition-transform duration-75"
+                          style={{
+                            objectPosition: `${avatarOffsetX}% ${avatarOffsetY}%`,
+                            transform: `translate(${(50 - avatarOffsetX) * 0.35}%, ${(18 - avatarOffsetY) * 0.35}%) scale(${avatarZoom})`,
+                            transformOrigin: 'center bottom',
+                          }}
+                        />
                       ) : (
                         <div className="relative z-10 w-20 h-20 mb-2 rounded-2xl border border-white/25 bg-black/75 backdrop-blur-md flex items-center justify-center text-lg font-bold text-white uppercase shadow-xl">
                           {(profile.name || 'YC')
@@ -2954,39 +2777,21 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                     }}
                   >
                     <div
-                      onClick={(e) => {
-                        if (onOpenImageHub) {
-                          e.stopPropagation();
-                          onOpenImageHub('portrait');
-                        } else if (onUpdateCard) {
-                          e.stopPropagation();
-                        }
-                      }}
-                      onPointerDown={!onOpenImageHub && onUpdateCard ? handlePortraitPointerDown : undefined}
-                      onPointerMove={!onOpenImageHub && onUpdateCard ? handlePortraitPointerMove : undefined}
-                      onPointerUp={!onOpenImageHub && onUpdateCard ? handlePortraitPointerUp : undefined}
-                      onPointerCancel={!onOpenImageHub && onUpdateCard ? handlePortraitPointerUp : undefined}
-                      style={{ touchAction: !onOpenImageHub && onUpdateCard ? 'none' : undefined }}
-                      title={onOpenImageHub ? 'Click to open Image Hub (Zoom & Pan Portrait)' : (onUpdateCard ? 'Drag to position portrait' : profile.name)}
-                      className={`group/portrait relative shrink-0 w-24 h-28 flex items-end justify-center -mb-0.5 overflow-hidden ${
-                        onOpenImageHub ? 'cursor-pointer' : (onUpdateCard ? (isDraggingPortrait ? 'cursor-grabbing' : 'cursor-grab') : '')
-                      }`}
+                      className="group/portrait relative shrink-0 w-24 h-28 flex items-end justify-center -mb-0.5 overflow-hidden"
+                      title={profile.name}
                     >
                       {silhouetteCutoutUrl || profile.avatarUrl ? (
-                        <>
-                          <img
-                            src={silhouetteCutoutUrl || profile.avatarUrl}
-                            alt={profile.name}
-                            draggable={false}
-                            className="w-full h-full object-contain object-bottom pointer-events-none transition-transform duration-75"
-                            style={{
-                              objectPosition: `${avatarOffsetX}% ${avatarOffsetY}%`,
-                              transform: `translate(${(50 - avatarOffsetX) * 0.35}%, ${(18 - avatarOffsetY) * 0.35}%) scale(${avatarZoom})`,
-                              transformOrigin: 'center bottom',
-                            }}
-                          />
-                          {renderFloatingZoomControls()}
-                        </>
+                        <img
+                          src={silhouetteCutoutUrl || profile.avatarUrl}
+                          alt={profile.name}
+                          draggable={false}
+                          className="w-full h-full object-contain object-bottom pointer-events-none transition-transform duration-75"
+                          style={{
+                            objectPosition: `${avatarOffsetX}% ${avatarOffsetY}%`,
+                            transform: `translate(${(50 - avatarOffsetX) * 0.35}%, ${(18 - avatarOffsetY) * 0.35}%) scale(${avatarZoom})`,
+                            transformOrigin: 'center bottom',
+                          }}
+                        />
                       ) : (
                         <div className="w-20 h-20 mb-2 rounded-2xl border border-white/25 bg-black/75 backdrop-blur-md flex items-center justify-center text-lg font-bold text-white uppercase shadow-xl">
                           {(profile.name || 'YC')
