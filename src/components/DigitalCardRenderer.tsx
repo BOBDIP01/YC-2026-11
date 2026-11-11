@@ -68,6 +68,7 @@ interface DigitalCardRendererProps {
   onSelectTheme?: (theme: CardTheme) => void;
   showRecipientActions?: boolean;
   recipientMode?: boolean;
+  onOpenImageHub?: (section?: 'portrait' | 'background') => void;
 }
 
 export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
@@ -79,6 +80,7 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
   initialLayout = 'card_3d',
   showRecipientActions = false,
   recipientMode = false,
+  onOpenImageHub,
 }) => {
   // Support card-level identity overrides (populated from Identity Settings on card creation, editable per card)
   const resolvedHolderName =
@@ -820,9 +822,17 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
   ) => {
     return (
       <div
-        className={`group/portrait relative overflow-hidden select-none ${frameClassName}`}
+        className={`group/portrait relative overflow-hidden select-none ${frameClassName} ${
+          onOpenImageHub && !recipientMode ? 'cursor-pointer hover:ring-2 hover:ring-indigo-400/80 transition-all' : ''
+        }`}
         style={extraFrameStyle}
-        title={profile.name}
+        title={onOpenImageHub && !recipientMode ? `Click to open Photo Hub · ${profile.name}` : profile.name}
+        onClick={(e) => {
+          if (onOpenImageHub && !recipientMode) {
+            e.stopPropagation();
+            onOpenImageHub('portrait');
+          }
+        }}
       >
         {profile.avatarUrl ? (
           <img
@@ -1491,8 +1501,16 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                   >
                     {/* Frameless 3D Photorealistic Person Silhouette standing cleanly in front of the 3D stage */}
                     <div
-                      className="group/portrait relative shrink-0 flex items-end justify-center w-24 sm:w-28 h-28 sm:h-32 -mb-0.5 overflow-hidden"
-                      title={profile.name}
+                      className={`group/portrait relative shrink-0 flex items-end justify-center w-24 sm:w-28 h-28 sm:h-32 -mb-0.5 overflow-hidden ${
+                        onOpenImageHub && !recipientMode ? 'cursor-pointer hover:opacity-95' : ''
+                      }`}
+                      title={onOpenImageHub && !recipientMode ? `Click to open Photo Hub · ${profile.name}` : profile.name}
+                      onClick={(e) => {
+                        if (onOpenImageHub && !recipientMode) {
+                          e.stopPropagation();
+                          onOpenImageHub('portrait');
+                        }
+                      }}
                     >
                       {silhouetteCutoutUrl || profile.avatarUrl ? (
                         <img
@@ -2777,8 +2795,16 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                     }}
                   >
                     <div
-                      className="group/portrait relative shrink-0 w-24 h-28 flex items-end justify-center -mb-0.5 overflow-hidden"
-                      title={profile.name}
+                      className={`group/portrait relative shrink-0 w-24 h-28 flex items-end justify-center -mb-0.5 overflow-hidden ${
+                        onOpenImageHub && !recipientMode ? 'cursor-pointer hover:opacity-95' : ''
+                      }`}
+                      title={onOpenImageHub && !recipientMode ? `Click to open Photo Hub · ${profile.name}` : profile.name}
+                      onClick={(e) => {
+                        if (onOpenImageHub && !recipientMode) {
+                          e.stopPropagation();
+                          onOpenImageHub('portrait');
+                        }
+                      }}
                     >
                       {silhouetteCutoutUrl || profile.avatarUrl ? (
                         <img

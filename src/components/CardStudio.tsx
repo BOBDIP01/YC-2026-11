@@ -442,7 +442,15 @@ export const CardStudio: React.FC<CardStudioProps> = ({
         isHeadshotPreset ? 'image_headshot' : 'image_3d_avatar',
         `${chosenLabel} (${profile.name})`
       );
-      if (!allowed) return;
+      if (!allowed) {
+        setAvatarCreationStatus(
+          'You need AI Coins to generate this avatar. Opening Plan & Booster Pack manager...'
+        );
+        onOpenSubscriptionModal?.(
+          'You have used all AI Coins in your current plan. Add a 50-Coin AI Booster Pack (valid 3 months) or upgrade your plan to generate and modify photos.'
+        );
+        return;
+      }
     }
 
     const activeSourcePortrait = profile.avatarUrl;
@@ -1428,6 +1436,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
               onUpdateCard={onUpdateCard}
               onAddContactToCRM={onAddContactToCRM}
               interactive={true}
+              onOpenImageHub={handleOpenImageHub}
             />
           </div>
 
@@ -2280,7 +2289,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                               <button
                                 type="button"
                                 onClick={handleRecreate3DAvatar}
-                                disabled={isRecreating3DAvatar || !avatarCustomCommand.trim()}
+                                disabled={isRecreating3DAvatar}
                                 className="h-8 px-3 rounded-lg bg-gradient-to-r from-indigo-600 via-indigo-500 to-amber-500 hover:opacity-95 text-white font-bold text-xs inline-flex items-center justify-center gap-1.5 whitespace-nowrap shadow-md transition disabled:opacity-50 shrink-0"
                               >
                                 <Wand2 className={`h-3.5 w-3.5 shrink-0 ${isRecreating3DAvatar ? 'animate-spin' : ''}`} />

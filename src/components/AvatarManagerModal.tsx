@@ -477,6 +477,8 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
         `AI Headshot Studio (${activeStyleDisplayLabel})`
       );
       if (!allowed) {
+        setErrorMsg('You have used all AI Coins in your current plan. Please add an AI Booster Pack or upgrade your plan.');
+        onOpenSubscriptionModal?.('You have used all AI Coins in your current plan. Please add an AI Booster Pack or upgrade your plan.');
         return;
       }
     }
