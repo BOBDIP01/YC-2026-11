@@ -17,7 +17,9 @@ export default defineConfig(() => {
       },
     },
     server: {
-      hmr: true,
+      hmr: {
+        clientPort: 3000,
+      },
     },
     build: {
       chunkSizeWarningLimit: 2500,

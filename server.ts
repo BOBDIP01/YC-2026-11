@@ -2738,11 +2738,24 @@ async function startServer() {
   const server = http.createServer(app);
 
   // Initialize Real WebSocket Server for P2P Radar with 10 MB max frame size (accommodates high-res vCards/avatars) and Origin verification
+  // Using noServer: true so non-radar WebSocket requests (such as Vite HMR) are not aborted with 400
   const wss = new WebSocketServer({
-    server,
-    path: '/api/p2p-radar',
+    noServer: true,
     maxPayload: 10 * 1024 * 1024,
     verifyClient: (info: { origin: string; secure: boolean; req: http.IncomingMessage }) => isAllowedOrigin(info.origin),
+  });
+
+  server.on('upgrade', (req, socket, head) => {
+    try {
+      const parsedUrl = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
+      if (parsedUrl.pathname === '/api/p2p-radar') {
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          wss.emit('connection', ws, req);
+        });
+      }
+    } catch {
+      socket.destroy();
+    }
   });
 
   // Automatic mutual card exchange between Room Creator (Host) and every participant in the room
@@ -3397,7 +3410,10 @@ async function startServer() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        ws: { server },
+        hmr: {
+          server,
+          clientPort: 3000,
+        },
       },
       appType: 'spa',
     });
