@@ -371,6 +371,9 @@ export interface StoryDeckSpotlight {
   imageUrl?: string;
 }
 
+export type CardLogoPosition = 'top_right' | 'identity_row' | 'top_left';
+export type CardLogoSize = 'compact' | 'standard' | 'prominent';
+
 export interface DigitalCard {
   id: string;
   name: string;
@@ -412,6 +415,9 @@ export interface DigitalCard {
   silhouetteCutoutUrl?: string;
   companyLogoUrl?: string;
   customLogoUrl?: string;
+  logoPlacement?: CardLogoPosition;
+  logoSize?: CardLogoSize;
+  logoWatermark?: boolean;
   primaryCta?: PrimaryCtaConfig;
   videoIntroUrl?: string;
   videoTitle?: string;

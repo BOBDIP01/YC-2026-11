@@ -7,6 +7,8 @@ import {
   CardLayoutMode,
   CardFontPairing,
   CardContentLayout,
+  CardLogoPosition,
+  CardLogoSize,
   CRMContact,
   PortfolioItem,
 } from '../types';
@@ -806,6 +808,32 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
   const activeContentLayout: CardContentLayout = card.contentLayout || 'executive_left';
 
   const companyLogo = card.companyLogoUrl || profile.workData?.companyLogoUrl || profile.companyLogoUrl;
+  const logoPlacement: CardLogoPosition = card.logoPlacement || 'top_right';
+  const logoSize: CardLogoSize = card.logoSize || 'standard';
+  const showLogoWatermark = card.logoWatermark !== false && Boolean(companyLogo) && card.visibleFields.companyLogo !== false;
+
+  const getLogoSizeClasses = (size: CardLogoSize = 'standard') => {
+    switch (size) {
+      case 'prominent':
+        return {
+          img: 'max-h-11 sm:max-h-12 max-w-[130px]',
+          container: 'px-3 py-1.5 min-h-[48px] min-w-[56px]',
+        };
+      case 'compact':
+        return {
+          img: 'max-h-6 max-w-[80px]',
+          container: 'px-2 py-1 min-h-[32px] min-w-[36px]',
+        };
+      case 'standard':
+      default:
+        return {
+          img: 'max-h-8 sm:max-h-9 max-w-[105px]',
+          container: 'px-2.5 py-1 min-h-[38px] min-w-[44px]',
+        };
+    }
+  };
+  const logoSizeClasses = getLogoSizeClasses(logoSize);
+
   const coverBanner = card.coverBannerUrl;
   const is3DSilhouetteStage = false;
   const stageEnvironmentUrl = coverBanner;
@@ -1420,20 +1448,23 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1.5 drop-shadow-[0_6px_12px_rgba(0,0,0,0.85)]">
+                    <div className="flex flex-col items-end gap-2 drop-shadow-[0_6px_12px_rgba(0,0,0,0.85)]">
+                      {companyLogo && card.visibleFields.companyLogo !== false && logoPlacement === 'top_right' && (
+                        <div
+                          className={`rounded-xl bg-black/85 border border-white/25 flex items-center justify-center shrink-0 shadow-2xl transition-all duration-300 hover:scale-105 ${logoSizeClasses.container}`}
+                          title={profile.workData?.company || profile.company}
+                          style={{
+                            boxShadow: `0 8px 20px -4px rgba(0,0,0,0.7), 0 0 16px -2px ${card.accentColor}40`,
+                          }}
+                        >
+                          <img
+                            src={companyLogo}
+                            alt="Company Logo"
+                            className={`${logoSizeClasses.img} object-contain rounded-sm`}
+                          />
+                        </div>
+                      )}
                       <div className="flex items-center gap-1.5">
-                        {companyLogo && card.visibleFields.companyLogo !== false && (
-                          <div
-                            className="px-2 py-0.5 rounded-md bg-black/80 border border-white/25 flex items-center justify-center shrink-0 shadow-lg"
-                            title={profile.workData?.company || profile.company}
-                          >
-                            <img
-                              src={companyLogo}
-                              alt="Company Logo"
-                              className="max-h-4 max-w-[70px] object-contain rounded"
-                            />
-                          </div>
-                        )}
                         <span
                           className="text-[10px] font-mono uppercase tracking-wider font-bold px-2.5 py-0.5 rounded border shadow-lg"
                           style={{
@@ -1443,11 +1474,6 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                           }}
                         >
                           {card.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-black/75 text-amber-300 border border-amber-400/40">
-                          3D Spatial Stage
                         </span>
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded border bg-black/75 text-white border-white/20">
                           #{card.tag || 'Executive'}
@@ -1642,6 +1668,26 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                     {card.theme === 'frosted_glass' && (
                       <div className="absolute -top-12 -left-12 w-48 h-48 bg-cyan-400/20 rounded-full blur-3xl" />
                     )}
+
+                    {/* Floating 3D Holographic Brand Watermark Crest (translateZ: 14px) */}
+                    {showLogoWatermark && (
+                      <div
+                        className="absolute right-3 bottom-14 pointer-events-none select-none overflow-hidden transition-all duration-700"
+                        style={{
+                          transform: parallaxEnabled ? 'translateZ(14px) rotate(-6deg)' : 'translateZ(0px)',
+                        }}
+                      >
+                        <img
+                          src={companyLogo}
+                          alt=""
+                          aria-hidden="true"
+                          className="w-28 h-28 sm:w-36 sm:h-36 object-contain opacity-[0.09] dark:opacity-[0.14] filter contrast-125"
+                          style={{
+                            mixBlendMode: themeConfig.isLight ? 'multiply' : 'screen',
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Card Header: Metallic NFC Chip, Brand Logo & Edition Badge */}
@@ -1653,8 +1699,10 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                     }}
                   >
                     <div
-                      className="flex items-center gap-3"
+                      className="flex items-center gap-2.5"
                       style={{
+                        transformStyle: 'preserve-3d',
+                        transform: parallaxEnabled ? 'translateZ(38px) translateY(-2px)' : 'translateZ(0px)',
                         filter:
                           parallaxEnabled && !themeConfig.isLight
                             ? 'drop-shadow(6px 12px 14px rgba(0,0,0,0.8))'
@@ -1685,30 +1733,54 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                       >
                         <Radio className="h-5 w-5 transform -rotate-45" />
                       </div>
+
+                      {/* Top-Left Logo Showcase */}
+                      {companyLogo && card.visibleFields.companyLogo !== false && logoPlacement === 'top_left' && (
+                        <div
+                          className={`rounded-xl bg-black/75 dark:bg-black/85 border border-white/25 backdrop-blur-md flex items-center justify-center shrink-0 shadow-xl ml-1 transition-all duration-300 hover:scale-105 ${logoSizeClasses.container}`}
+                          title={profile.workData?.company || profile.company}
+                          style={{
+                            boxShadow: `0 8px 20px -4px rgba(0,0,0,0.7), 0 0 16px -2px ${card.accentColor}35`,
+                          }}
+                        >
+                          <img
+                            src={companyLogo}
+                            alt="Company Logo"
+                            className={`${logoSizeClasses.img} object-contain rounded-sm`}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div
-                      className="flex flex-col items-end gap-1.5"
+                      className="flex flex-col items-end gap-2"
                       style={{
+                        transformStyle: 'preserve-3d',
+                        transform: parallaxEnabled ? 'translateZ(44px) translateY(-2px)' : 'translateZ(0px)',
                         filter:
                           parallaxEnabled && !themeConfig.isLight
                             ? 'drop-shadow(6px 12px 14px rgba(0,0,0,0.85))'
                             : undefined,
                       }}
                     >
+                      {/* Top-Right Logo Showcase (Default Prominent Luxury Emblem) */}
+                      {companyLogo && card.visibleFields.companyLogo !== false && logoPlacement === 'top_right' && (
+                        <div
+                          className={`rounded-xl bg-black/75 dark:bg-black/85 border border-white/25 backdrop-blur-md flex items-center justify-center shrink-0 shadow-2xl transition-all duration-300 hover:scale-105 ${logoSizeClasses.container}`}
+                          title={profile.workData?.company || profile.company}
+                          style={{
+                            boxShadow: `0 8px 20px -4px rgba(0,0,0,0.7), 0 0 16px -2px ${card.accentColor}35`,
+                          }}
+                        >
+                          <img
+                            src={companyLogo}
+                            alt="Company Logo"
+                            className={`${logoSizeClasses.img} object-contain rounded-sm`}
+                          />
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-1.5">
-                        {companyLogo && card.visibleFields.companyLogo !== false && (
-                          <div
-                            className="px-2 py-0.5 rounded-md bg-black/80 border border-white/25 backdrop-blur-md flex items-center justify-center shrink-0 shadow-lg"
-                            title={profile.workData?.company || profile.company}
-                          >
-                            <img
-                              src={companyLogo}
-                              alt="Company Logo"
-                              className="max-h-4 max-w-[70px] object-contain rounded"
-                            />
-                          </div>
-                        )}
                         <span
                           className="text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded border shadow-sm"
                           style={{
@@ -1719,10 +1791,10 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                         >
                           {card.name}
                         </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded border ${themeConfig.accentBg}`}>
+                          #{card.tag || 'Executive'}
+                        </span>
                       </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded border ${themeConfig.accentBg}`}>
-                        #{card.tag || 'Executive'}
-                      </span>
                     </div>
                   </div>
 
@@ -1822,14 +1894,28 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                           </p>
                         )}
                         {(card.visibleFields.company || card.visibleFields.department) && (
-                          <p className={`text-xs truncate ${themeConfig.subtleText}`}>
-                            {card.visibleFields.company ? profile.workData?.company || profile.company : ''}
-                            {card.visibleFields.department && profile.workData?.department
-                              ? card.visibleFields.company
-                                ? ` · ${profile.workData.department}`
-                                : profile.workData.department
-                              : ''}
-                          </p>
+                          <div className="flex items-center gap-2 mt-0.5 min-w-0">
+                            {companyLogo && card.visibleFields.companyLogo !== false && logoPlacement === 'identity_row' && (
+                              <div
+                                className="h-7 w-7 rounded-lg bg-black/60 border border-white/20 p-1 flex items-center justify-center shrink-0 shadow-md backdrop-blur-xs"
+                                title={profile.workData?.company || profile.company}
+                              >
+                                <img
+                                  src={companyLogo}
+                                  alt="Logo"
+                                  className="h-full w-full object-contain"
+                                />
+                              </div>
+                            )}
+                            <p className={`text-xs truncate ${themeConfig.subtleText}`}>
+                              {card.visibleFields.company ? profile.workData?.company || profile.company : ''}
+                              {card.visibleFields.department && profile.workData?.department
+                                ? card.visibleFields.company
+                                  ? ` · ${profile.workData.department}`
+                                  : profile.workData.department
+                                : ''}
+                            </p>
+                          </div>
                         )}
                         {card.visibleFields.location && profile.location && (
                           <div
@@ -2900,7 +2986,9 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                         {card.name}
                       </span>
                       {companyLogo && card.visibleFields.companyLogo !== false && (
-                        <img src={companyLogo} alt="Logo" className="h-4 max-w-[60px] object-contain rounded" />
+                        <div className="px-2 py-0.5 rounded-md bg-black/60 border border-white/20 backdrop-blur-xs flex items-center justify-center">
+                          <img src={companyLogo} alt="Logo" className="h-6 max-w-[85px] object-contain rounded" />
+                        </div>
                       )}
                     </div>
                     <h3 className={`text-xl sm:text-2xl font-bold mt-1 truncate ${themeConfig.fontFamily}`}>
@@ -2952,7 +3040,9 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                         {card.name}
                       </span>
                       {companyLogo && card.visibleFields.companyLogo !== false && (
-                        <img src={companyLogo} alt="Logo" className="h-4 max-w-[60px] object-contain rounded" />
+                        <div className="px-2 py-0.5 rounded-md bg-black/60 border border-white/20 backdrop-blur-xs flex items-center justify-center">
+                          <img src={companyLogo} alt="Logo" className="h-6 max-w-[85px] object-contain rounded" />
+                        </div>
                       )}
                     </div>
                     <h3
@@ -3156,7 +3246,9 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                         {card.name}
                       </span>
                       {companyLogo && card.visibleFields.companyLogo !== false && (
-                        <img src={companyLogo} alt="Logo" className="h-4 max-w-[60px] object-contain rounded" />
+                        <div className="px-2 py-0.5 rounded-md bg-black/60 border border-white/20 backdrop-blur-xs flex items-center justify-center">
+                          <img src={companyLogo} alt="Logo" className="h-6 max-w-[85px] object-contain rounded" />
+                        </div>
                       )}
                     </div>
                     <h3 className={`text-xl sm:text-2xl font-bold mt-1 truncate ${themeConfig.fontFamily}`}>

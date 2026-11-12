@@ -5060,6 +5060,110 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                       </div>
                     </div>
 
+                    {/* 3D Card Logo Presentation & WOW Effects */}
+                    <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <Sliders className="h-3.5 w-3.5 text-indigo-400" />
+                          <span>3D Card Logo Presentation</span>
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/30">
+                          3D Spatial Effects
+                        </span>
+                      </div>
+
+                      {/* Control 1: Logo Position on 3D Card */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-semibold text-slate-300">
+                          Emblem Position on 3D Card
+                        </label>
+                        <div className="grid grid-cols-3 gap-1.5 text-xs">
+                          {[
+                            { id: 'top_right', label: 'Top-Right Emblem', desc: 'Floating luxury pedestal' },
+                            { id: 'identity_row', label: 'Identity Row', desc: 'Beside company name' },
+                            { id: 'top_left', label: 'Top-Left Badge', desc: 'Beside smart chip' },
+                          ].map((pos) => {
+                            const isSelected = (activeCard.logoPlacement || 'top_right') === pos.id;
+                            return (
+                              <button
+                                key={pos.id}
+                                type="button"
+                                onClick={() => onUpdateCard({ ...activeCard, logoPlacement: pos.id as any })}
+                                className={`p-2 rounded-lg border text-left transition flex flex-col justify-between ${
+                                  isSelected
+                                    ? 'border-indigo-500 bg-indigo-950/60 text-white shadow-sm'
+                                    : 'border-slate-800 bg-slate-950 hover:bg-slate-800/60 text-slate-400 hover:text-slate-200'
+                                }`}
+                              >
+                                <span className="font-semibold text-[11px] leading-tight block">{pos.label}</span>
+                                <span className="text-[9px] text-slate-500 mt-0.5 block">{pos.desc}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Control 2: Logo Dimension */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-semibold text-slate-300">
+                          Emblem Dimension & Scale
+                        </label>
+                        <div className="grid grid-cols-3 gap-1.5 text-xs">
+                          {[
+                            { id: 'compact', label: 'Compact', size: '24px' },
+                            { id: 'standard', label: 'Standard', size: '34px (Recommended)' },
+                            { id: 'prominent', label: 'Prominent', size: '44px (Hero Crest)' },
+                          ].map((sz) => {
+                            const isSelected = (activeCard.logoSize || 'standard') === sz.id;
+                            return (
+                              <button
+                                key={sz.id}
+                                type="button"
+                                onClick={() => onUpdateCard({ ...activeCard, logoSize: sz.id as any })}
+                                className={`p-2 rounded-lg border text-left transition flex flex-col justify-between ${
+                                  isSelected
+                                    ? 'border-indigo-500 bg-indigo-950/60 text-white shadow-sm'
+                                    : 'border-slate-800 bg-slate-950 hover:bg-slate-800/60 text-slate-400 hover:text-slate-200'
+                                }`}
+                              >
+                                <span className="font-semibold text-[11px] leading-tight block">{sz.label}</span>
+                                <span className="text-[9px] text-slate-500 mt-0.5 block">{sz.size}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Control 3: Holographic 3D Watermark Toggle */}
+                      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                            <Sparkles className="h-3 w-3 text-amber-400" />
+                            <span>Holographic 3D Watermark</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400">
+                            Embeds an oversized laser-etched watermark of the crest deep in the 3D card background with parallax depth.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = activeCard.logoWatermark !== false;
+                            onUpdateCard({ ...activeCard, logoWatermark: !current });
+                          }}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            activeCard.logoWatermark !== false ? 'bg-indigo-600' : 'bg-slate-800'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              activeCard.logoWatermark !== false ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
                     {/* AI Brand Logo & Emblem Generator */}
                     <div className="p-3.5 rounded-xl bg-slate-900/90 border border-indigo-500/30 space-y-2.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
