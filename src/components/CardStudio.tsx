@@ -213,6 +213,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   >([]);
   const [enlargedPreviewImage, setEnlargedPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'profile' | 'images' | 'card' | 'fields'>('profile');
+  const [desktopSectionFilter, setDesktopSectionFilter] = useState<'all' | 'master' | 'card'>('all');
   const [isMobileEditorOpen, setIsMobileEditorOpen] = useState(false);
   const mobileEditorSectionRef = useRef<HTMLDivElement | null>(null);
   const [openAccordions, setOpenAccordions] = useState<{
@@ -242,6 +243,11 @@ export const CardStudio: React.FC<CardStudioProps> = ({
     }
     const targetKey = sectionKey || 'personal';
     setIsMobileEditorOpen(true);
+    if (targetKey === 'personal' || targetKey === 'work' || targetKey === 'socials') {
+      if (desktopSectionFilter === 'card') setDesktopSectionFilter('all');
+    } else {
+      if (desktopSectionFilter === 'master') setDesktopSectionFilter('all');
+    }
     setOpenAccordions({
       personal: targetKey === 'personal',
       work: targetKey === 'work',
@@ -1767,17 +1773,56 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           ref={mobileEditorSectionRef}
           className={`${isMobileEditorOpen ? 'block' : 'hidden lg:block'} lg:col-span-7 space-y-3 scroll-mt-20`}
         >
-          {/* Card Hub Single-Level Workspace Header (Desktop only; Mobile uses the Horizontal Icon Menu) */}
+          {/* Card Hub Workspace Header (Desktop only; Mobile uses the Quick-Recall Dock) */}
           <div className="hidden lg:flex items-center justify-between gap-2 px-1 pb-1">
-            <div>
-              <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                 <Sliders className="h-3.5 w-3.5 text-indigo-400" />
-                <span>Card Hub Sections</span>
+                <span>Card Hub</span>
               </h2>
-              <p className="text-[11px] text-slate-400">
-                Tap any section below to expand or collapse. Changes update your card live.
-              </p>
+
+              {/* Segmented Filter Pills */}
+              <div className="flex items-center p-0.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setDesktopSectionFilter('all')}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition ${
+                    desktopSectionFilter === 'all'
+                      ? 'bg-slate-800 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  All (8)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDesktopSectionFilter('master')}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
+                    desktopSectionFilter === 'master'
+                      ? 'bg-rose-950/80 border border-rose-500/40 text-rose-200 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Show only Master Profile data (Identity, Work, Socials)"
+                >
+                  <User className="h-3 w-3 text-rose-400" />
+                  <span>Master Data</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDesktopSectionFilter('card')}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition flex items-center gap-1 ${
+                    desktopSectionFilter === 'card'
+                      ? 'bg-indigo-950/80 border border-indigo-500/40 text-indigo-200 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title={`Show only ${activeCard.name} customization & privacy`}
+                >
+                  <Sparkles className="h-3 w-3 text-indigo-400" />
+                  <span className="truncate max-w-[120px]">{activeCard.name}</span>
+                </button>
+              </div>
             </div>
+
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
@@ -1789,32 +1834,26 @@ export const CardStudio: React.FC<CardStudioProps> = ({
             </div>
           </div>
 
-          {/* ================================================================= */}
-          {/* BLOCK 1: MASTER PROFILE DATA (SHARED BY ALL CARDS · FILL ONCE)     */}
-          {/* ================================================================= */}
-          <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-slate-900/60 to-purple-950/30 p-3.5 sm:p-4 shadow-sm flex items-start gap-3">
-            <div className="h-9 w-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center shrink-0 mt-0.5">
-              <User className="h-4 w-4 text-indigo-300" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs sm:text-sm font-bold text-white tracking-wide">
-                  Master Profile Data
+          {/* Minimal Master Profile Subhead */}
+          {(desktopSectionFilter === 'all' || desktopSectionFilter === 'master') && (
+            <div className="flex items-center justify-between gap-2 pt-1 pb-0.5 px-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5 text-rose-400" />
+                  <span>Master Profile Data</span>
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-[10px] font-mono text-indigo-300 font-semibold">
-                  Shared · Fill Once
+                <span className="text-[10px] text-slate-500 font-medium">
+                  · Shared by all cards (fill once)
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
-                Your master coordinates, corporate credentials, and social channels. All cards display these fields unless hidden in <strong>Selective Sharing</strong> below.
-              </p>
+              <div className="h-px bg-slate-800/80 flex-1 ml-2 hidden sm:block" />
             </div>
-          </div>
+          )}
 
           {/* ================================================================= */}
           {/* ACCORDION 1: PERSONAL IDENTITY & COORDINATES                      */}
           {/* ================================================================= */}
-          <div className={`${openAccordions.personal ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
+          <div className={`${openAccordions.personal ? 'block' : 'hidden'} ${desktopSectionFilter === 'card' ? 'lg:hidden' : 'lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
               type="button"
               onClick={() => toggleAccordion('personal')}
@@ -1871,7 +1910,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           {/* ================================================================= */}
           {/* ACCORDION 2: WORK & CORPORATE CREDENTIALS                         */}
           {/* ================================================================= */}
-          <div className={`${openAccordions.work ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
+          <div className={`${openAccordions.work ? 'block' : 'hidden'} ${desktopSectionFilter === 'card' ? 'lg:hidden' : 'lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
               type="button"
               onClick={() => toggleAccordion('work')}
@@ -1928,7 +1967,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           {/* ================================================================= */}
           {/* ACCORDION 3: SOCIAL & MESSAGING NETWORKS                          */}
           {/* ================================================================= */}
-          <div className={`${openAccordions.socials ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
+          <div className={`${openAccordions.socials ? 'block' : 'hidden'} ${desktopSectionFilter === 'card' ? 'lg:hidden' : 'lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
               type="button"
               onClick={() => toggleAccordion('socials')}
@@ -1982,28 +2021,21 @@ export const CardStudio: React.FC<CardStudioProps> = ({
             )}
           </div>
 
-          {/* ================================================================= */}
-          {/* ================================================================= */}
-          {/* BLOCK 2: CUSTOMIZE THIS CARD · {activeCard.name}                   */}
-          {/* ================================================================= */}
-          <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-slate-900/60 to-emerald-950/30 p-3.5 sm:p-4 shadow-sm flex items-start gap-3 mt-4">
-            <div className="h-9 w-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0 mt-0.5">
-              <Sparkles className="h-4 w-4 text-purple-300" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs sm:text-sm font-bold text-white tracking-wide">
-                  Customize This Card: {activeCard.name}
+          {/* Minimal Card Customization Subhead */}
+          {(desktopSectionFilter === 'all' || desktopSectionFilter === 'card') && (
+            <div className={`flex items-center justify-between gap-2 pb-0.5 px-1 ${desktopSectionFilter === 'all' ? 'pt-4 border-t border-slate-800/60 mt-3' : 'pt-1'}`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5 truncate">
+                  <Sparkles className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                  <span className="truncate">This Card: {activeCard.name}</span>
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/40 text-[10px] font-mono text-purple-300 font-semibold">
-                  Per-Card Privacy & Style
+                <span className="text-[10px] text-slate-500 font-medium shrink-0">
+                  · Privacy & Customization
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
-                Control which master data is revealed on this card, and customize its unique portrait, cover art, theme layout, and passions.
-              </p>
+              <div className="h-px bg-slate-800/80 flex-1 ml-2 hidden sm:block" />
             </div>
-          </div>
+          )}
 
           {/* ACCORDION 4: SELECTIVE SHARING & FIELD VISIBILITY                 */}
           {/* ================================================================= */}
@@ -2306,7 +2338,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
             ).length;
 
             return (
-              <div className={`${openAccordions.sharing ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
+              <div className={`${openAccordions.sharing ? 'block' : 'hidden'} ${desktopSectionFilter === 'master' ? 'lg:hidden' : 'lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
                 <button
                   type="button"
                   onClick={() => toggleAccordion('sharing')}
@@ -2977,7 +3009,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                 {/* ACCORDION 5: PORTRAIT & AI AVATAR STUDIO */}
                 <div
                   ref={portraitSectionRef}
-                  className={`${openAccordions.portrait ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}
+                  className={`${openAccordions.portrait ? 'block' : 'hidden'} ${desktopSectionFilter === 'master' ? 'lg:hidden' : 'lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}
                 >
                   <button
                     type="button"
@@ -3470,7 +3502,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                 </div>
 
                 {/* ACCORDION 6: CARD BACKGROUND & SCENIC STUDIO */}
-                <div className={`${openAccordions.background ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
+                <div className={`${openAccordions.background ? 'block' : 'hidden'} ${desktopSectionFilter === 'master' ? 'lg:hidden' : 'lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
                   <button
                     type="button"
                     onClick={() => toggleAccordion('background')}
@@ -3892,7 +3924,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           {/* ================================================================= */}
           {/* ACCORDION 7: CARD THEME, LAYOUT & BRAND LOGO                      */}
           {/* ================================================================= */}
-          <div className={`${openAccordions.theme ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
+          <div className={`${openAccordions.theme ? 'block' : 'hidden'} ${desktopSectionFilter === 'master' ? 'lg:hidden' : 'lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
               type="button"
               onClick={() => toggleAccordion('theme')}
@@ -5204,7 +5236,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           {/* ================================================================= */}
           {/* ACCORDION 8: PASSIONS, EDUCATION & ARTIST PORTFOLIO               */}
           {/* ================================================================= */}
-          <div className={`${openAccordions.beyond ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
+          <div className={`${openAccordions.beyond ? 'block' : 'hidden'} ${desktopSectionFilter === 'master' ? 'lg:hidden' : 'lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
               type="button"
               onClick={() => toggleAccordion('beyond')}
