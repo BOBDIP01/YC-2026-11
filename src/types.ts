@@ -398,7 +398,9 @@ export interface DigitalCard {
   showNfcChip?: boolean;
   showQrOnFront?: boolean;
   cardPattern?: 'subtle_grid' | 'metallic_mesh' | 'geometric_lines' | 'clean' | 'topographic';
-  // Personalization Features: Cover Banner, Brand Logo, CTA, Video & Portrait Cutout Framing
+  // Personalization Features: Card-Specific Portrait, Cover Banner, Brand Logo, CTA, Video & Framing
+  avatarUrl?: string;
+  previousAvatarUrl?: string;
   coverBannerUrl?: string;
   avatarOffsetX?: number; // 0 to 100 (default 50)
   avatarOffsetY?: number; // 0 to 100 (default 18 for natural face focus)

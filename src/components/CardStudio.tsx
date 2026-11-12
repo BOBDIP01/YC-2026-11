@@ -344,17 +344,27 @@ export const CardStudio: React.FC<CardStudioProps> = ({
 
   // Preserve previous portrait only if explicitly recorded before an AI transformation
   const originalPortraitUrl =
-    profile.previousAvatarUrl && profile.previousAvatarUrl !== profile.avatarUrl
+    activeCard.previousAvatarUrl && activeCard.previousAvatarUrl !== (activeCard.avatarUrl || profile.avatarUrl)
+      ? activeCard.previousAvatarUrl
+      : profile.previousAvatarUrl && profile.previousAvatarUrl !== profile.avatarUrl
       ? profile.previousAvatarUrl
       : undefined;
 
   const handleRestoreOriginalAvatar = async () => {
     if (!originalPortraitUrl) return;
-    onUpdateProfile({
-      ...profile,
-      avatarUrl: originalPortraitUrl,
-      previousAvatarUrl: undefined,
-    });
+    if (activeCard.avatarUrl) {
+      onUpdateCard({
+        ...activeCard,
+        avatarUrl: originalPortraitUrl,
+        previousAvatarUrl: undefined,
+      });
+    } else {
+      onUpdateProfile({
+        ...profile,
+        avatarUrl: originalPortraitUrl,
+        previousAvatarUrl: undefined,
+      });
+    }
     setAvatarCreationStatus('Previous portrait restored.');
     setTimeout(() => setAvatarCreationStatus(null), 3000);
   };
@@ -393,11 +403,15 @@ export const CardStudio: React.FC<CardStudioProps> = ({
         );
         onUpdateProfile({
           ...profile,
-          previousAvatarUrl: undefined,
-          avatarUrl: compressedUrl,
+          avatarUrl: profile.avatarUrl || compressedUrl,
           storedPictures: [newPic, ...currentPics],
         });
-        setAvatarCreationStatus(`Uploaded "${cleanName}" and set as active profile image.`);
+        onUpdateCard({
+          ...activeCard,
+          avatarUrl: compressedUrl,
+          previousAvatarUrl: activeCard.avatarUrl || profile.avatarUrl,
+        });
+        setAvatarCreationStatus(`Uploaded "${cleanName}" and applied to ${activeCard.name}.`);
         setTimeout(() => setAvatarCreationStatus(null), 3500);
       };
       img.src = rawDataUrl;
@@ -406,9 +420,10 @@ export const CardStudio: React.FC<CardStudioProps> = ({
     e.target.value = '';
   };
 
-  // Unified AI Headshot, Attire & 3D/Stylized Avatar Generator from Active Profile Image (profile.avatarUrl)
+  // Unified AI Headshot, Attire & 3D/Stylized Avatar Generator from Active Portrait
   const handleRecreate3DAvatar = async () => {
-    if (isRecreating3DAvatar || !profile.avatarUrl) return;
+    const currentActivePortrait = activeCard.avatarUrl || profile.avatarUrl;
+    if (isRecreating3DAvatar || !currentActivePortrait) return;
 
     const headshotStyleIds = ['executive', 'casual', 'country_club', 'athletic', 'cyber', 'editorial', 'custom_only'];
     const isHeadshotPreset = headshotStyleIds.includes(avatarStylePreset);
@@ -453,7 +468,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
       }
     }
 
-    const activeSourcePortrait = profile.avatarUrl;
+    const activeSourcePortrait = currentActivePortrait;
     setIsRecreating3DAvatar(true);
     setAvatarCreationStatus(null);
 
@@ -515,12 +530,16 @@ export const CardStudio: React.FC<CardStudioProps> = ({
         );
         onUpdateProfile({
           ...profile,
-          previousAvatarUrl: activeSourcePortrait,
-          avatarUrl: finalHeadshotUrl,
+          avatarUrl: profile.avatarUrl || finalHeadshotUrl,
           storedPictures: [newHeadshotEntry, ...existingPics],
         });
+        onUpdateCard({
+          ...activeCard,
+          avatarUrl: finalHeadshotUrl,
+          previousAvatarUrl: activeSourcePortrait,
+        });
         setAvatarCreationStatus(
-          `Applied "${newHeadshotEntry.name}" to your active portrait and saved to your Image Hub Vault.`
+          `Applied "${newHeadshotEntry.name}" to ${activeCard.name} and saved to your Image Vault.`
         );
       } catch (err) {
         console.warn('Headshot enhancement error:', err);
@@ -584,12 +603,16 @@ export const CardStudio: React.FC<CardStudioProps> = ({
       );
       onUpdateProfile({
         ...profile,
-        previousAvatarUrl: activeSourcePortrait,
-        avatarUrl: finalAvatarUrl,
+        avatarUrl: profile.avatarUrl || finalAvatarUrl,
         storedPictures: [newAvatarEntry, ...existingPics],
       });
+      onUpdateCard({
+        ...activeCard,
+        avatarUrl: finalAvatarUrl,
+        previousAvatarUrl: activeSourcePortrait,
+      });
       setAvatarCreationStatus(
-        `Applied "${newAvatarEntry.name}" to your active portrait and saved to your Image Hub Vault.`
+        `Applied "${newAvatarEntry.name}" to ${activeCard.name} and saved to your Image Vault.`
       );
     } catch (err) {
       console.warn('3D Avatar creation notice:', err);
@@ -1003,7 +1026,8 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   const handleDeletePortraitFromVault = (e: React.MouseEvent | undefined, pic: StoredPicture) => {
     if (e) e.stopPropagation();
     const wasActive = profile.avatarUrl?.trim() === pic.url?.trim();
-    setDeletedPortraitsHistory((prev) => [{ item: pic, wasActive }, ...prev]);
+    const wasCardActive = activeCard.avatarUrl?.trim() === pic.url?.trim();
+    setDeletedPortraitsHistory((prev) => [{ item: pic, wasActive: wasActive || wasCardActive }, ...prev]);
 
     const nextPics = (profile.storedPictures || []).filter(
       (p) => p.id !== pic.id && p.url.trim() !== pic.url.trim()
@@ -1016,6 +1040,12 @@ export const CardStudio: React.FC<CardStudioProps> = ({
       avatarUrl: wasActive ? remainingAvatars[0]?.url || '' : profile.avatarUrl,
       storedPictures: nextPics,
     });
+    if (wasCardActive) {
+      onUpdateCard({
+        ...activeCard,
+        avatarUrl: undefined,
+      });
+    }
   };
 
   // Undo the most recent portrait deletion
@@ -1215,10 +1245,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                 {cards.map((c, idx) => {
                   const isActive = c.id === activeCard.id;
                   const isLockedByFreeTier = subscription?.tier === 'free' && idx >= 2;
-                  const matchingPersona =
-                    allPersonas.find(
-                      (p) => p.id === c.id || p.circleName === c.name || p.profileTitle === c.name
-                    ) || profile;
+                  const cardPortrait = c.avatarUrl || profile.avatarUrl;
                   return (
                     <button
                       key={c.id}
@@ -1234,7 +1261,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                           return;
                         }
                         onSelectCard(c);
-                        if (matchingPersona) onSelectPersona(matchingPersona.id);
                         setIsCardSelectorOpen(false);
                       }}
                       className={`w-full flex items-center justify-between gap-2.5 p-2 rounded-lg text-xs transition ${
@@ -1246,9 +1272,9 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        {matchingPersona.avatarUrl || profile.avatarUrl ? (
+                        {cardPortrait ? (
                           <img
-                            src={matchingPersona.avatarUrl || profile.avatarUrl}
+                            src={cardPortrait}
                             alt={c.name}
                             className={`h-7 w-7 rounded-full object-cover border border-white/20 shrink-0 ${
                               isLockedByFreeTier ? 'opacity-40 grayscale' : ''
@@ -1260,7 +1286,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                               isLockedByFreeTier ? 'opacity-40 grayscale' : ''
                             }`}
                           >
-                            {(matchingPersona.name || profile.name || 'YC')
+                            {(c.name || 'YC')
                               .trim()
                               .split(/\s+/)
                               .map((p) => p[0])
@@ -1271,6 +1297,11 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                         <div className="text-left min-w-0">
                           <div className="font-semibold truncate flex items-center gap-1.5">
                             <span>{c.name}</span>
+                            {c.avatarUrl && (
+                              <span className="px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[8px] font-mono">
+                                Custom Photo
+                              </span>
+                            )}
                             {isLockedByFreeTier && (
                               <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.2 text-[9px] text-amber-300">
                                 <Lock className="h-2.5 w-2.5" /> Basic+
@@ -1464,37 +1495,82 @@ export const CardStudio: React.FC<CardStudioProps> = ({
               )}
             </div>
 
-            <div className="grid grid-cols-4 gap-1.5">
-              {(
-                [
-                  { key: 'personal', label: 'Identity', icon: User, color: 'text-rose-400' },
-                  { key: 'work', label: 'Work', icon: Briefcase, color: 'text-indigo-400' },
-                  { key: 'beyond', label: 'Passions', icon: Sparkles, color: 'text-amber-400' },
-                  { key: 'socials', label: 'Socials', icon: Globe, color: 'text-cyan-400' },
-                  { key: 'portrait', label: 'Portrait', icon: Camera, color: 'text-purple-400' },
-                  { key: 'background', label: 'Cover', icon: Image, color: 'text-teal-400' },
-                  { key: 'theme', label: 'Theme', icon: Palette, color: 'text-amber-300' },
-                  { key: 'sharing', label: 'Visibility', icon: Eye, color: 'text-emerald-400' },
-                ] as const
-              ).map((item) => {
-                const IconComp = item.icon;
-                const isActiveSection = isMobileEditorOpen && openAccordions[item.key];
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => handleRecallMobileSection(item.key)}
-                    className={`flex flex-col items-center justify-center gap-1 py-2 px-1.5 rounded-xl border text-[11px] font-semibold transition ${
-                      isActiveSection
-                        ? 'border-indigo-500 bg-indigo-950/60 text-white shadow-sm'
-                        : 'border-slate-800 bg-slate-950/70 hover:bg-slate-800/70 text-slate-300'
-                    }`}
-                  >
-                    <IconComp className={`h-3.5 w-3.5 ${item.color}`} />
-                    <span className="truncate max-w-full">{item.label}</span>
-                  </button>
-                );
-              })}
+            {/* Master Profile Group (Shared across all cards) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between px-0.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                  <User className="h-3 w-3 text-rose-400" />
+                  <span>Master Data (Shared · Fill Once)</span>
+                </span>
+                <span className="text-[9px] font-mono text-slate-500">Global</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(
+                  [
+                    { key: 'personal', label: 'Identity', icon: User, color: 'text-rose-400' },
+                    { key: 'work', label: 'Work', icon: Briefcase, color: 'text-indigo-400' },
+                    { key: 'socials', label: 'Socials', icon: Globe, color: 'text-cyan-400' },
+                  ] as const
+                ).map((item) => {
+                  const IconComp = item.icon;
+                  const isActiveSection = isMobileEditorOpen && openAccordions[item.key];
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => handleRecallMobileSection(item.key)}
+                      className={`flex flex-col items-center justify-center gap-1 py-2 px-1.5 rounded-xl border text-[11px] font-semibold transition ${
+                        isActiveSection
+                          ? 'border-indigo-500 bg-indigo-950/60 text-white shadow-sm'
+                          : 'border-slate-800 bg-slate-950/70 hover:bg-slate-800/70 text-slate-300'
+                      }`}
+                    >
+                      <IconComp className={`h-3.5 w-3.5 ${item.color}`} />
+                      <span className="truncate max-w-full">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* This Card Group (Per-card personalization & privacy) */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between px-0.5">
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1 truncate">
+                  <Sparkles className="h-3 w-3 text-indigo-400 shrink-0" />
+                  <span className="truncate">This Card: {activeCard.name}</span>
+                </span>
+                <span className="text-[9px] font-mono text-indigo-400/80 shrink-0">Per-Card</span>
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {(
+                  [
+                    { key: 'sharing', label: 'Visibility', icon: Eye, color: 'text-emerald-400' },
+                    { key: 'portrait', label: 'Portrait', icon: Camera, color: 'text-purple-400' },
+                    { key: 'background', label: 'Cover', icon: Image, color: 'text-teal-400' },
+                    { key: 'theme', label: 'Theme', icon: Palette, color: 'text-amber-300' },
+                    { key: 'beyond', label: 'Passions', icon: Sparkles, color: 'text-amber-400' },
+                  ] as const
+                ).map((item) => {
+                  const IconComp = item.icon;
+                  const isActiveSection = isMobileEditorOpen && openAccordions[item.key];
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => handleRecallMobileSection(item.key)}
+                      className={`flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-xl border text-[10px] font-semibold transition ${
+                        isActiveSection
+                          ? 'border-indigo-500 bg-indigo-950/60 text-white shadow-sm'
+                          : 'border-slate-800 bg-slate-950/70 hover:bg-slate-800/70 text-slate-300'
+                      }`}
+                    >
+                      <IconComp className={`h-3.5 w-3.5 ${item.color}`} />
+                      <span className="truncate max-w-full">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -1714,6 +1790,28 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           </div>
 
           {/* ================================================================= */}
+          {/* BLOCK 1: MASTER PROFILE DATA (SHARED BY ALL CARDS · FILL ONCE)     */}
+          {/* ================================================================= */}
+          <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-slate-900/60 to-purple-950/30 p-3.5 sm:p-4 shadow-sm flex items-start gap-3">
+            <div className="h-9 w-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center shrink-0 mt-0.5">
+              <User className="h-4 w-4 text-indigo-300" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-white tracking-wide">
+                  Master Profile Data
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-[10px] font-mono text-indigo-300 font-semibold">
+                  Shared · Fill Once
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                Your master coordinates, corporate credentials, and social channels. All cards display these fields unless hidden in <strong>Selective Sharing</strong> below.
+              </p>
+            </div>
+          </div>
+
+          {/* ================================================================= */}
           {/* ACCORDION 1: PERSONAL IDENTITY & COORDINATES                      */}
           {/* ================================================================= */}
           <div className={`${openAccordions.personal ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
@@ -1828,64 +1926,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           </div>
 
           {/* ================================================================= */}
-          {/* ACCORDION 3: PASSIONS, EDUCATION & ARTIST PORTFOLIO               */}
-          {/* ================================================================= */}
-          <div className={`${openAccordions.beyond ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
-            <button
-              type="button"
-              onClick={() => toggleAccordion('beyond')}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-slate-800/40 transition"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-9 w-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
-                  <Sparkles className="h-4 w-4 text-amber-400" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs sm:text-sm font-bold text-white truncate">
-                      Passions, Education & Portfolio
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 truncate">
-                    Hobbies & sports, academic credentials, and creative portfolio works
-                  </p>
-                </div>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200 ${
-                  openAccordions.beyond ? 'rotate-180 text-amber-400' : ''
-                }`}
-              />
-            </button>
-            {openAccordions.beyond && (
-              <div className="p-4 sm:p-5 border-t border-slate-800/80 bg-slate-950/40">
-                <MasterProfileEditor
-                  sectionMode="beyond"
-                  profile={profile}
-                  activeCard={activeCard}
-                  onUpdateProfile={onUpdateProfile}
-                  onUpdateCard={onUpdateCard}
-                  onConsumeAiCoin={onConsumeAiCoin}
-                  onOpenKYCModal={() => setIsKYCModalOpen(true)}
-                  onOpenBioModal={() => setIsBioModalOpen(true)}
-                  onOpenImageHub={(sub) => {
-                    setOpenAccordions((prev) => ({
-                      ...prev,
-                      portrait: sub !== 'background',
-                      background: sub === 'background',
-                    }));
-                  }}
-                  onOpenAvatarModal={(tab) => {
-                    setAvatarModalTab(tab);
-                    setIsAvatarModalOpen(true);
-                  }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* ================================================================= */}
-          {/* ACCORDION 4: SOCIAL & MESSAGING NETWORKS                          */}
+          {/* ACCORDION 3: SOCIAL & MESSAGING NETWORKS                          */}
           {/* ================================================================= */}
           <div className={`${openAccordions.socials ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
             <button
@@ -1942,9 +1983,832 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           </div>
 
           {/* ================================================================= */}
-          {/* ACCORDION 5 & 6: PORTRAIT STUDIO & BACKGROUND STUDIO              */}
+          {/* ================================================================= */}
+          {/* BLOCK 2: CUSTOMIZE THIS CARD · {activeCard.name}                   */}
+          {/* ================================================================= */}
+          <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-slate-900/60 to-emerald-950/30 p-3.5 sm:p-4 shadow-sm flex items-start gap-3 mt-4">
+            <div className="h-9 w-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0 mt-0.5">
+              <Sparkles className="h-4 w-4 text-purple-300" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-white tracking-wide">
+                  Customize This Card: {activeCard.name}
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/40 text-[10px] font-mono text-purple-300 font-semibold">
+                  Per-Card Privacy & Style
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                Control which master data is revealed on this card, and customize its unique portrait, cover art, theme layout, and passions.
+              </p>
+            </div>
+          </div>
+
+          {/* ACCORDION 4: SELECTIVE SHARING & FIELD VISIBILITY                 */}
           {/* ================================================================= */}
           {(() => {
+            const formatAddr = (addr?: {
+              street?: string;
+              city?: string;
+              state?: string;
+              zip?: string;
+              country?: string;
+            }) => {
+              if (!addr) return '';
+              return [addr.street, addr.city, addr.state, addr.zip, addr.country]
+                .map((s) => (s || '').trim())
+                .filter(Boolean)
+                .join(', ');
+            };
+
+            const formatEmergency = (
+              ec?: {
+                name?: string;
+                relationship?: string;
+                phone?: string;
+              },
+              ecList?: Array<{
+                name?: string;
+                relationship?: string;
+                phone?: string;
+              }>
+            ) => {
+              const items =
+                ecList && ecList.length > 0
+                  ? ecList.filter((item) => Boolean(item.name || item.phone))
+                  : ec && (ec.name || ec.phone)
+                  ? [ec]
+                  : [];
+              if (items.length === 0) return '';
+              return items
+                .map((item) =>
+                  [item.name, item.relationship, item.phone]
+                    .map((s) => (s || '').trim())
+                    .filter(Boolean)
+                    .join(' · ')
+                )
+                .join(' | ');
+            };
+
+            const activeLogoVal = (
+              activeCard.companyLogoUrl ||
+              profile.workData?.companyLogoUrl ||
+              profile.companyLogoUrl ||
+              ''
+            ).trim();
+
+            // 1. Work & Corporate Data — automatically filter out unfilled Master Identity fields
+            const availableWorkFields: Array<{
+              key: keyof CardVisibleFields;
+              label: string;
+              desc: string;
+            }> = (
+              [
+                {
+                  key: 'role' as keyof CardVisibleFields,
+                  label: 'Executive Role / Job Title',
+                  desc: (profile.workData?.role || profile.role || '').trim(),
+                },
+                {
+                  key: 'company' as keyof CardVisibleFields,
+                  label: 'Company / Organization',
+                  desc: (profile.workData?.company || profile.company || '').trim(),
+                },
+                {
+                  key: 'companyLogo' as keyof CardVisibleFields,
+                  label: 'Company Logo Badge',
+                  desc: activeLogoVal
+                    ? activeLogoVal.startsWith('data:')
+                      ? 'Custom Uploaded / AI Brand Emblem'
+                      : activeLogoVal
+                    : '',
+                },
+                {
+                  key: 'headline' as keyof CardVisibleFields,
+                  label: 'Executive Headline',
+                  desc: (profile.headline || '').trim(),
+                },
+                {
+                  key: 'department' as keyof CardVisibleFields,
+                  label: 'Department / Division',
+                  desc: (profile.workData?.department || '').trim(),
+                },
+                {
+                  key: 'email' as keyof CardVisibleFields,
+                  label: 'Corporate Direct Email',
+                  desc: (profile.workData?.email || profile.email || '').trim(),
+                },
+                {
+                  key: 'phone' as keyof CardVisibleFields,
+                  label: 'Work Direct Phone / Desk',
+                  desc: (profile.workData?.phone || profile.phone || '').trim(),
+                },
+                {
+                  key: 'officeAddress' as keyof CardVisibleFields,
+                  label: 'Office Address / HQ',
+                  desc: formatAddr(profile.workData?.officeAddress),
+                },
+                {
+                  key: 'taxIdOrVat' as keyof CardVisibleFields,
+                  label: 'Tax ID / Corporate VAT',
+                  desc: (profile.workData?.taxIdOrVat || '').trim(),
+                },
+              ]
+            ).filter((f) => Boolean(f.desc));
+
+            const workFieldKeys = availableWorkFields.map((f) => f.key);
+            const isAllWorkSelected =
+              workFieldKeys.length > 0 &&
+              workFieldKeys.every((k) => activeCard.visibleFields[k] !== false && Boolean(activeCard.visibleFields[k] ?? (k === 'companyLogo')));
+            const activeWorkCount = workFieldKeys.filter(
+              (k) => k === 'companyLogo' ? activeCard.visibleFields.companyLogo !== false : !!activeCard.visibleFields[k]
+            ).length;
+
+            // 2. Personal Data Coordinates — automatically filter out unfilled Master Identity fields
+            const availablePersonalFields: Array<{
+              key: keyof CardVisibleFields;
+              label: string;
+              desc: string;
+            }> = (
+              [
+                {
+                  key: 'personalBio' as keyof CardVisibleFields,
+                  label: 'Personal Bio & About Note',
+                  desc: (profile.personalData?.bio || '').trim(),
+                },
+                {
+                  key: 'personalPhone' as keyof CardVisibleFields,
+                  label: 'Personal Mobile Phone',
+                  desc: (profile.personalData?.phone || '').trim(),
+                },
+                {
+                  key: 'personalEmail' as keyof CardVisibleFields,
+                  label: 'Personal Email (iCloud/Gmail)',
+                  desc: (profile.personalData?.email || '').trim(),
+                },
+                {
+                  key: 'nickname' as keyof CardVisibleFields,
+                  label: 'Nickname / Preferred Name',
+                  desc: (profile.personalData?.nickname || '').trim(),
+                },
+                {
+                  key: 'pronouns' as keyof CardVisibleFields,
+                  label: 'Preferred Pronouns',
+                  desc: (profile.personalData?.pronouns || '').trim(),
+                },
+                {
+                  key: 'gender' as keyof CardVisibleFields,
+                  label: 'Gender Identity',
+                  desc: (profile.personalData?.gender || '').trim(),
+                },
+                {
+                  key: 'homeAddress' as keyof CardVisibleFields,
+                  label: 'Home Residential Address',
+                  desc: formatAddr(profile.personalData?.address),
+                },
+                {
+                  key: 'birthday' as keyof CardVisibleFields,
+                  label: 'Birthday Date (BDAY)',
+                  desc: (profile.personalData?.birthday || '').trim(),
+                },
+                {
+                  key: 'emergencyContact' as keyof CardVisibleFields,
+                  label: `Emergency ICE Contacts (${
+                    (profile.personalData?.emergencyContacts?.filter((c) => c.name || c.phone).length ||
+                      (profile.personalData?.emergencyContact?.name ? 1 : 0))
+                  })`,
+                  desc: formatEmergency(
+                    profile.personalData?.emergencyContact,
+                    profile.personalData?.emergencyContacts
+                  ),
+                },
+              ]
+            ).filter((f) => Boolean(f.desc));
+
+            const personalFieldKeys = availablePersonalFields.map((f) => f.key);
+            const isAllPersonalSelected =
+              personalFieldKeys.length > 0 &&
+              personalFieldKeys.every((k) => !!activeCard.visibleFields[k]);
+            const activePersonalCount = personalFieldKeys.filter(
+              (k) => !!activeCard.visibleFields[k]
+            ).length;
+
+            // 3. Social Media Channels — automatically filter out unfilled social accounts (supports multiple profiles on same platform)
+            const filledSocialEntries = getFilledSocialAccounts(profile);
+            const isAllSocialsSelected =
+              filledSocialEntries.length > 0 &&
+              activeCard.visibleFields.socials !== false &&
+              filledSocialEntries.every((entry) => isSocialAccountVisible(activeCard, entry));
+            const activeSocialsCount =
+              activeCard.visibleFields.socials === false
+                ? 0
+                : filledSocialEntries.filter((entry) => isSocialAccountVisible(activeCard, entry))
+                    .length;
+
+            // 4. General Web, Bio & Story Deck Slide 03 Showcase — automatically filter out unfilled fields
+            const passionsList = (profile.passions || []).filter((p) =>
+              Boolean(p.title?.trim() || p.detail?.trim())
+            );
+            const educationList = (profile.education || []).filter((e) =>
+              Boolean(
+                e.institution?.trim() ||
+                  e.degree?.trim() ||
+                  e.year?.trim() ||
+                  e.honors?.trim()
+              )
+            );
+            const portfolioList = (profile.portfolio || []).filter((item) => {
+              const isUntouchedDefault =
+                item.title === 'New Portfolio Work' &&
+                item.mediumOrRole === 'Mixed Media / Performance' &&
+                item.imageUrl === profile.avatarUrl;
+              if (isUntouchedDefault) return false;
+              return Boolean(
+                item.title?.trim() ||
+                  item.mediumOrRole?.trim() ||
+                  (item as any).roleOrMedium?.trim() ||
+                  item.imageUrl?.trim() ||
+                  item.description?.trim()
+              );
+            });
+
+            const availableGeneralFields: Array<{
+              key: keyof CardVisibleFields;
+              label: string;
+              desc: string;
+            }> = (
+              [
+                {
+                  key: 'website' as keyof CardVisibleFields,
+                  label: 'Official Website / Portfolio',
+                  desc: (profile.website || profile.workData?.website || '').trim(),
+                },
+                {
+                  key: 'location' as keyof CardVisibleFields,
+                  label: 'City Location',
+                  desc: (profile.location || '').trim(),
+                },
+                {
+                  key: 'bio' as keyof CardVisibleFields,
+                  label: 'Work Executive Bio Summary',
+                  desc: (profile.workData?.bio || profile.bio || '').trim(),
+                },
+                {
+                  key: 'passions' as keyof CardVisibleFields,
+                  label: `Hobbies, Sports & Passions (${passionsList.length})`,
+                  desc: passionsList
+                    .map((p) => p.title?.trim() || p.detail?.trim())
+                    .filter(Boolean)
+                    .join(' · '),
+                },
+                {
+                  key: 'education' as keyof CardVisibleFields,
+                  label: `Education & Academic Credentials (${educationList.length})`,
+                  desc: educationList
+                    .map((e) =>
+                      [e.degree?.trim(), e.institution?.trim()].filter(Boolean).join(' — ') ||
+                      e.honors?.trim() ||
+                      e.year?.trim()
+                    )
+                    .filter(Boolean)
+                    .join(' · '),
+                },
+                {
+                  key: 'portfolioSection' as keyof CardVisibleFields,
+                  label: `Artist & Creative Portfolio (${portfolioList.length})`,
+                  desc: portfolioList
+                    .map(
+                      (item) =>
+                        item.title?.trim() ||
+                        item.mediumOrRole?.trim() ||
+                        (item as any).roleOrMedium?.trim() ||
+                        'Artwork'
+                    )
+                    .filter(Boolean)
+                    .join(' · '),
+                },
+              ]
+            ).filter((f) => Boolean(f.desc));
+
+            const generalFieldKeys = availableGeneralFields.map((f) => f.key);
+            const isAllGeneralSelected =
+              generalFieldKeys.length > 0 &&
+              generalFieldKeys.every((k) =>
+                k === 'passions' || k === 'education' || k === 'portfolioSection'
+                  ? activeCard.visibleFields[k] !== false
+                  : !!activeCard.visibleFields[k]
+              );
+            const activeGeneralCount = generalFieldKeys.filter((k) =>
+              k === 'passions' || k === 'education' || k === 'portfolioSection'
+                ? activeCard.visibleFields[k] !== false
+                : !!activeCard.visibleFields[k]
+            ).length;
+
+            return (
+              <div className={`${openAccordions.sharing ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
+                <button
+                  type="button"
+                  onClick={() => toggleAccordion('sharing')}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-slate-800/40 transition"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-9 w-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                      <Eye className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs sm:text-sm font-bold text-white truncate">
+                          Selective Sharing & Field Visibility
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        Control exactly which filled work, personal, and social fields are visible on "{activeCard.name}"
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronDown
+                    className={`h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200 ${
+                      openAccordions.sharing ? 'rotate-180 text-emerald-400' : ''
+                    }`}
+                  />
+                </button>
+
+                {openAccordions.sharing && (
+                  <div className="p-4 sm:p-5 border-t border-slate-800/80 bg-slate-950/40 space-y-5 animate-in fade-in duration-150">
+                    {/* Group 1: Work & Corporate Data */}
+                {availableWorkFields.length > 0 && (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-indigo-900/40 pb-2.5">
+                      <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
+                        <Briefcase className="h-3.5 w-3.5 text-indigo-400" />
+                        <span>Work & Corporate Data</span>
+                        <span className="text-[10px] font-mono text-indigo-400/80 font-normal">
+                          ({activeWorkCount}/{workFieldKeys.length})
+                        </span>
+                      </div>
+                      <div
+                        onClick={() => {
+                          const nextState = !isAllWorkSelected;
+                          const updatedFields = { ...activeCard.visibleFields };
+                          workFieldKeys.forEach((k) => {
+                            (updatedFields as any)[k] = nextState;
+                          });
+                          onUpdateCard({
+                            ...activeCard,
+                            visibleFields: updatedFields,
+                          });
+                        }}
+                        className="flex items-center gap-2 cursor-pointer select-none group"
+                      >
+                        <span className="text-[11px] font-medium text-slate-300 group-hover:text-white transition">
+                          {isAllWorkSelected ? 'Unselect All' : 'Select All'}
+                        </span>
+                        <button
+                          type="button"
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            isAllWorkSelected ? 'bg-indigo-600' : 'bg-slate-800'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              isAllWorkSelected ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {availableWorkFields.map((field) => {
+                        const isVisible =
+                          field.key === 'companyLogo'
+                            ? activeCard.visibleFields.companyLogo !== false
+                            : !!activeCard.visibleFields[field.key];
+                        return (
+                          <div
+                            key={field.key}
+                            onClick={() =>
+                              onUpdateCard({
+                                ...activeCard,
+                                visibleFields: {
+                                  ...activeCard.visibleFields,
+                                  [field.key]: !isVisible,
+                                },
+                              })
+                            }
+                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition ${
+                              isVisible
+                                ? 'border-indigo-500/50 bg-indigo-950/30 text-white'
+                                : 'border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            <div className="truncate pr-2">
+                              <div className="text-xs font-semibold leading-tight">{field.label}</div>
+                              <div className="text-[11px] text-slate-400 truncate max-w-[200px]">{field.desc}</div>
+                            </div>
+                            <button
+                              type="button"
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                isVisible ? 'bg-indigo-600' : 'bg-slate-800'
+                              }`}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                  isVisible ? 'translate-x-4' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Group 2: Personal Data Coordinates */}
+                {availablePersonalFields.length > 0 && (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-rose-900/40 pb-2.5">
+                      <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
+                        <User className="h-3.5 w-3.5 text-rose-400" />
+                        <span>Personal Data Coordinates</span>
+                        <span className="text-[10px] font-mono text-rose-400/80 font-normal">
+                          ({activePersonalCount}/{personalFieldKeys.length})
+                        </span>
+                      </div>
+                      <div
+                        onClick={() => {
+                          const nextState = !isAllPersonalSelected;
+                          const updatedFields = { ...activeCard.visibleFields };
+                          personalFieldKeys.forEach((k) => {
+                            (updatedFields as any)[k] = nextState;
+                          });
+                          onUpdateCard({
+                            ...activeCard,
+                            visibleFields: updatedFields,
+                          });
+                        }}
+                        className="flex items-center gap-2 cursor-pointer select-none group"
+                      >
+                        <span className="text-[11px] font-medium text-slate-300 group-hover:text-white transition">
+                          {isAllPersonalSelected ? 'Unselect All' : 'Select All'}
+                        </span>
+                        <button
+                          type="button"
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            isAllPersonalSelected ? 'bg-rose-600' : 'bg-slate-800'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              isAllPersonalSelected ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {availablePersonalFields.map((field) => {
+                        const isVisible = !!activeCard.visibleFields[field.key];
+                        return (
+                          <div
+                            key={field.key}
+                            onClick={() =>
+                              onUpdateCard({
+                                ...activeCard,
+                                visibleFields: {
+                                  ...activeCard.visibleFields,
+                                  [field.key]: !isVisible,
+                                },
+                              })
+                            }
+                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition ${
+                              isVisible
+                                ? 'border-rose-500/50 bg-rose-950/30 text-white'
+                                : 'border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            <div className="truncate pr-2">
+                              <div className="text-xs font-semibold leading-tight">{field.label}</div>
+                              <div className="text-[11px] text-slate-400 truncate max-w-[200px]">{field.desc}</div>
+                            </div>
+                            <button
+                              type="button"
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                isVisible ? 'bg-rose-600' : 'bg-slate-800'
+                              }`}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                  isVisible ? 'translate-x-4' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Group 3: Major Social Media Channels to Share */}
+                {filledSocialEntries.length > 0 && (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-cyan-900/40 pb-2.5">
+                      <div className="flex items-center gap-2 text-xs font-bold text-cyan-300">
+                        <Globe className="h-4 w-4 text-cyan-400" />
+                        <span>
+                          Major Social Media Symbols ({activeSocialsCount}/{filledSocialEntries.length} Displayed on Card)
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                        {/* Preset quick filters */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextSocialAccounts: Record<string, boolean> = {
+                              ...(activeCard.visibleFields.socialAccounts || {}),
+                            };
+                            const newFields = { ...activeCard.visibleFields, socials: true };
+                            const proList: Array<keyof typeof profile.socials> = ['linkedin', 'twitter', 'github', 'calendly', 'substack', 'medium', 'behance', 'dribbble'];
+                            filledSocialEntries.forEach((entry) => {
+                              const match = proList.includes(entry.platformId);
+                              nextSocialAccounts[entry.id] = match;
+                              newFields[entry.platformId] = match;
+                            });
+                            newFields.socialAccounts = nextSocialAccounts;
+                            onUpdateCard({ ...activeCard, visibleFields: newFields });
+                          }}
+                          className="px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800 hover:bg-indigo-900/60 transition"
+                        >
+                          💼 Business
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextSocialAccounts: Record<string, boolean> = {
+                              ...(activeCard.visibleFields.socialAccounts || {}),
+                            };
+                            const newFields = { ...activeCard.visibleFields, socials: true };
+                            const persList: Array<keyof typeof profile.socials> = ['whatsapp', 'telegram', 'signal', 'instagram', 'facebook', 'snapchat', 'wechat'];
+                            filledSocialEntries.forEach((entry) => {
+                              const match = persList.includes(entry.platformId);
+                              nextSocialAccounts[entry.id] = match;
+                              newFields[entry.platformId] = match;
+                            });
+                            newFields.socialAccounts = nextSocialAccounts;
+                            onUpdateCard({ ...activeCard, visibleFields: newFields });
+                          }}
+                          className="px-2 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800 hover:bg-rose-900/60 transition"
+                        >
+                          🏠 Personal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextSocialAccounts: Record<string, boolean> = {
+                              ...(activeCard.visibleFields.socialAccounts || {}),
+                            };
+                            const newFields = { ...activeCard.visibleFields, socials: true };
+                            const creatorList: Array<keyof typeof profile.socials> = ['youtube', 'tiktok', 'threads', 'discord', 'reddit', 'twitch', 'spotify', 'pinterest'];
+                            filledSocialEntries.forEach((entry) => {
+                              const match = creatorList.includes(entry.platformId);
+                              nextSocialAccounts[entry.id] = match;
+                              newFields[entry.platformId] = match;
+                            });
+                            newFields.socialAccounts = nextSocialAccounts;
+                            onUpdateCard({ ...activeCard, visibleFields: newFields });
+                          }}
+                          className="px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800 hover:bg-amber-900/60 transition"
+                        >
+                          🎮 Creator
+                        </button>
+
+                        <span className="text-slate-700">|</span>
+
+                        {/* Select / Unselect All Toggle */}
+                        <div
+                          onClick={() => {
+                            const nextState = !isAllSocialsSelected;
+                            const nextSocialAccounts: Record<string, boolean> = {
+                              ...(activeCard.visibleFields.socialAccounts || {}),
+                            };
+                            const newFields = {
+                              ...activeCard.visibleFields,
+                              socials: nextState,
+                            };
+                            filledSocialEntries.forEach((entry) => {
+                              nextSocialAccounts[entry.id] = nextState;
+                              newFields[entry.platformId] = nextState;
+                            });
+                            newFields.socialAccounts = nextSocialAccounts;
+                            onUpdateCard({ ...activeCard, visibleFields: newFields });
+                          }}
+                          className="flex items-center gap-2 cursor-pointer select-none group"
+                        >
+                          <span className="text-[11px] font-medium text-slate-300 group-hover:text-white transition">
+                            {isAllSocialsSelected ? 'Unselect All' : 'Select All'}
+                          </span>
+                          <button
+                            type="button"
+                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              isAllSocialsSelected ? 'bg-cyan-600' : 'bg-slate-800'
+                            }`}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                isAllSocialsSelected ? 'translate-x-4' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400">
+                      Each enabled social channel (including multiple profiles on the same network) appears on "{activeCard.name}" as a touchable icon symbol that opens the page directly when tapped.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {filledSocialEntries.map((entry) => {
+                        const platform = getPlatformConfig(entry.platformId);
+                        const val = entry.value.trim();
+                        const isEnabledToggle = isSocialAccountVisible(activeCard, entry);
+
+                        return (
+                          <div
+                            key={entry.id}
+                            onClick={() => {
+                              const nextVal = !isEnabledToggle;
+                              const nextSocialAccounts: Record<string, boolean> = {
+                                ...(activeCard.visibleFields.socialAccounts || {}),
+                                [entry.id]: nextVal,
+                              };
+                              onUpdateCard({
+                                ...activeCard,
+                                visibleFields: {
+                                  ...activeCard.visibleFields,
+                                  socials: true,
+                                  [entry.platformId]: nextVal,
+                                  socialAccounts: nextSocialAccounts,
+                                },
+                              });
+                            }}
+                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition ${
+                              isEnabledToggle
+                                ? 'border-cyan-500/50 bg-cyan-950/20 text-white shadow-sm'
+                                : 'border-slate-800 bg-slate-900/50 text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                              <div
+                                className="p-1.5 rounded-md flex items-center justify-center shrink-0 border"
+                                style={{
+                                  backgroundColor: `${platform.color}15`,
+                                  borderColor: `${platform.color}35`,
+                                  color: platform.color,
+                                }}
+                              >
+                                {platform.renderIcon({ className: 'h-4 w-4', style: { color: platform.color } })}
+                              </div>
+                              <div className="min-w-0 truncate">
+                                <div className="text-xs font-semibold leading-tight flex items-center gap-1.5">
+                                  <span className="truncate">{platform.name}</span>
+                                  {entry.label?.trim() && (
+                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 shrink-0">
+                                      {entry.label.trim()}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-400 truncate max-w-[170px]">
+                                  {val}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                isEnabledToggle ? 'bg-cyan-600' : 'bg-slate-800'
+                              }`}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                  isEnabledToggle ? 'translate-x-4' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Group 4: General Coordinates */}
+                {availableGeneralFields.length > 0 && (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                        <Globe className="h-3.5 w-3.5 text-cyan-400" />
+                        <span>General Web & Summary Details</span>
+                        <span className="text-[10px] font-mono text-cyan-400/80 font-normal">
+                          ({activeGeneralCount}/{generalFieldKeys.length})
+                        </span>
+                      </div>
+                      <div
+                        onClick={() => {
+                          const nextState = !isAllGeneralSelected;
+                          const updatedFields = { ...activeCard.visibleFields };
+                          generalFieldKeys.forEach((k) => {
+                            (updatedFields as any)[k] = nextState;
+                          });
+                          onUpdateCard({
+                            ...activeCard,
+                            visibleFields: updatedFields,
+                          });
+                        }}
+                        className="flex items-center gap-2 cursor-pointer select-none group"
+                      >
+                        <span className="text-[11px] font-medium text-slate-300 group-hover:text-white transition">
+                          {isAllGeneralSelected ? 'Unselect All' : 'Select All'}
+                        </span>
+                        <button
+                          type="button"
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            isAllGeneralSelected ? 'bg-cyan-600' : 'bg-slate-800'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              isAllGeneralSelected ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {availableGeneralFields.map((field) => {
+                        const isVisible =
+                          field.key === 'passions' ||
+                          field.key === 'education' ||
+                          field.key === 'portfolioSection'
+                            ? activeCard.visibleFields[field.key] !== false
+                            : !!activeCard.visibleFields[field.key];
+                        return (
+                          <div
+                            key={field.key}
+                            onClick={() =>
+                              onUpdateCard({
+                                ...activeCard,
+                                visibleFields: {
+                                  ...activeCard.visibleFields,
+                                  [field.key]: !isVisible,
+                                },
+                              })
+                            }
+                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition ${
+                              isVisible
+                                ? 'border-cyan-500/50 bg-cyan-950/30 text-white'
+                                : 'border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            <div className="truncate pr-2">
+                              <div className="text-xs font-semibold leading-tight">{field.label}</div>
+                              <div className="text-[10px] text-slate-400 truncate max-w-[150px]">{field.desc}</div>
+                            </div>
+                            <button
+                              type="button"
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                isVisible ? 'bg-cyan-600' : 'bg-slate-800'
+                              }`}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                  isVisible ? 'translate-x-4' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+{/* ACCORDION 5 & 6: PORTRAIT STUDIO & BACKGROUND STUDIO              */}
+          {/* ================================================================= */}
+          {(() => {
+            const currentCardPortrait = (activeCard.avatarUrl || profile.avatarUrl || '').trim();
             const rawAvatars = (profile.storedPictures || []).filter(
               (p) => p.context !== 'banner' && p.category !== 'banner' && p.aspectRatio !== '16:9' && Boolean(p.url)
             );
@@ -1954,18 +2818,27 @@ export const CardStudio: React.FC<CardStudioProps> = ({
             // while the vault is open keeps every image in its current position.
             const anchorAvatarUrl = isPortraitVaultOpen
               ? portraitVaultAnchorUrl
-              : profile.avatarUrl?.trim() || '';
+              : currentCardPortrait;
             if (anchorAvatarUrl) {
               seenUrls.add(anchorAvatarUrl);
               const existingAnchor = rawAvatars.find((p) => p.url.trim() === anchorAvatarUrl);
               profileAvatarsVault.push(
                 existingAnchor || {
                   id: 'active-portrait-current',
-                  name: 'Active Portrait',
+                  name: activeCard.avatarUrl ? `${activeCard.name} Photo` : 'Active Portrait',
                   url: anchorAvatarUrl,
                   context: 'custom',
                 }
               );
+            }
+            if (profile.avatarUrl && profile.avatarUrl.trim() && !seenUrls.has(profile.avatarUrl.trim())) {
+              seenUrls.add(profile.avatarUrl.trim());
+              profileAvatarsVault.push({
+                id: 'active-portrait-master',
+                name: 'Master Profile Photo',
+                url: profile.avatarUrl.trim(),
+                context: 'custom',
+              });
             }
             for (const pic of rawAvatars) {
               const normalizedUrl = pic.url.trim();
@@ -1973,15 +2846,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                 seenUrls.add(normalizedUrl);
                 profileAvatarsVault.push(pic);
               }
-            }
-            if (profile.avatarUrl && profile.avatarUrl.trim() && !seenUrls.has(profile.avatarUrl.trim())) {
-              seenUrls.add(profile.avatarUrl.trim());
-              profileAvatarsVault.push({
-                id: 'active-portrait-selected',
-                name: 'Active Portrait',
-                url: profile.avatarUrl,
-                context: 'custom',
-              });
             }
 
             const headshotPresetsList = [
@@ -2170,20 +3034,20 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                             onClick={() => handleTogglePortraitVault()}
                             onDoubleClick={(e) => {
                               e.stopPropagation();
-                              if (profile.avatarUrl) {
+                              if (currentCardPortrait) {
                                 setEnlargedPreviewImage({
-                                  url: profile.avatarUrl,
-                                  title: `${profile.name} — Active Portrait`,
+                                  url: currentCardPortrait,
+                                  title: `${activeCard.name} — Active Portrait`,
                                 });
                               }
                             }}
                             className="group relative h-32 w-32 sm:h-36 sm:w-36 rounded-2xl overflow-hidden border-2 border-indigo-500/70 shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 transition block bg-slate-950"
                             title="Click to toggle Saved Vault · Double-click to enlarge & inspect"
                           >
-                            {profile.avatarUrl ? (
+                            {currentCardPortrait ? (
                               <img
-                                src={profile.avatarUrl}
-                                alt={profile.name}
+                                src={currentCardPortrait}
+                                alt={activeCard.name}
                                 className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                               />
                             ) : (
@@ -2196,13 +3060,41 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                             <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-indigo-600/95 text-[9px] font-mono font-bold text-white uppercase shadow">
-                              {profile.avatarUrl ? 'Active' : 'Empty'}
+                              {activeCard.avatarUrl ? 'Card Photo' : profile.avatarUrl ? 'Master Default' : 'Empty'}
                             </span>
                             <span className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-lg bg-black/80 py-1 text-[10px] font-semibold text-indigo-200 group-hover:bg-indigo-600 group-hover:text-white transition">
                               <Layers className="h-3 w-3 shrink-0" />
                               <span>Saved ({profileAvatarsVault.length})</span>
                             </span>
                           </button>
+                          {activeCard.avatarUrl && activeCard.avatarUrl !== profile.avatarUrl && (
+                            <div className="mt-2 flex flex-col gap-1 w-32 sm:w-36">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onUpdateCard({ ...activeCard, avatarUrl: undefined });
+                                  setAvatarCreationStatus(`Reset ${activeCard.name} to Master Profile photo.`);
+                                  setTimeout(() => setAvatarCreationStatus(null), 3000);
+                                }}
+                                className="w-full px-2 py-1 rounded-lg border border-purple-500/40 bg-purple-950/40 hover:bg-purple-900/60 text-purple-200 text-[10px] font-semibold transition text-center truncate"
+                                title="Revert to Master Profile default picture"
+                              >
+                                Reset to Master Photo
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onUpdateProfile({ ...profile, avatarUrl: activeCard.avatarUrl });
+                                  setAvatarCreationStatus(`Set as Master Profile default.`);
+                                  setTimeout(() => setAvatarCreationStatus(null), 3000);
+                                }}
+                                className="w-full px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition text-center truncate"
+                                title="Make this photo the default for all cards"
+                              >
+                                Set as Master Default
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         {/* Right: Uniform Buttons Row + AI Description & Instructions Box */}
@@ -2373,27 +3265,30 @@ export const CardStudio: React.FC<CardStudioProps> = ({
 
                           <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2.5">
                             {profileAvatarsVault.map((pic) => {
-                              const isCurrent = profile.avatarUrl?.trim() === pic.url?.trim();
+                              const isCurrentCardPic = currentCardPortrait?.trim() === pic.url?.trim();
+                              const isMasterPic = profile.avatarUrl?.trim() === pic.url?.trim();
                               return (
                                 <div
                                   key={pic.id}
                                   onClick={() => {
-                                    onUpdateProfile({
-                                      ...profile,
-                                      previousAvatarUrl: undefined,
+                                    onUpdateCard({
+                                      ...activeCard,
                                       avatarUrl: pic.url,
+                                      previousAvatarUrl: currentCardPortrait,
                                     });
+                                    setAvatarCreationStatus(`Applied "${pic.name}" to ${activeCard.name}.`);
+                                    setTimeout(() => setAvatarCreationStatus(null), 3000);
                                   }}
                                   onDoubleClick={(e) => {
                                     e.stopPropagation();
                                     setEnlargedPreviewImage({ url: pic.url, title: pic.name });
                                   }}
                                   className={`group relative aspect-square rounded-xl overflow-hidden border cursor-pointer transition ${
-                                    isCurrent
-                                      ? 'border-indigo-400 ring-2 ring-indigo-500/40 shadow-md'
+                                    isCurrentCardPic
+                                      ? 'border-purple-400 ring-2 ring-purple-500/40 shadow-md'
                                       : 'border-slate-800 hover:border-slate-600'
                                   }`}
-                                  title={`Click to select "${pic.name}" · Double-click to enlarge`}
+                                  title={`Click to set for "${activeCard.name}" · Double-click to enlarge`}
                                 >
                                   <img
                                     src={pic.url}
@@ -2401,9 +3296,14 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   />
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
-                                  {isCurrent && (
+                                  {isCurrentCardPic && (
+                                    <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-purple-600 text-[8px] font-bold text-white shadow">
+                                      Card Photo
+                                    </span>
+                                  )}
+                                  {!isCurrentCardPic && isMasterPic && (
                                     <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-indigo-600 text-[8px] font-bold text-white shadow">
-                                      Active
+                                      Master
                                     </span>
                                   )}
                                   <button
@@ -4302,807 +5202,64 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           </div>
 
           {/* ================================================================= */}
-          {/* ACCORDION 8: SELECTIVE SHARING & FIELD VISIBILITY                 */}
+          {/* ACCORDION 8: PASSIONS, EDUCATION & ARTIST PORTFOLIO               */}
           {/* ================================================================= */}
-          {(() => {
-            const formatAddr = (addr?: {
-              street?: string;
-              city?: string;
-              state?: string;
-              zip?: string;
-              country?: string;
-            }) => {
-              if (!addr) return '';
-              return [addr.street, addr.city, addr.state, addr.zip, addr.country]
-                .map((s) => (s || '').trim())
-                .filter(Boolean)
-                .join(', ');
-            };
-
-            const formatEmergency = (
-              ec?: {
-                name?: string;
-                relationship?: string;
-                phone?: string;
-              },
-              ecList?: Array<{
-                name?: string;
-                relationship?: string;
-                phone?: string;
-              }>
-            ) => {
-              const items =
-                ecList && ecList.length > 0
-                  ? ecList.filter((item) => Boolean(item.name || item.phone))
-                  : ec && (ec.name || ec.phone)
-                  ? [ec]
-                  : [];
-              if (items.length === 0) return '';
-              return items
-                .map((item) =>
-                  [item.name, item.relationship, item.phone]
-                    .map((s) => (s || '').trim())
-                    .filter(Boolean)
-                    .join(' · ')
-                )
-                .join(' | ');
-            };
-
-            const activeLogoVal = (
-              activeCard.companyLogoUrl ||
-              profile.workData?.companyLogoUrl ||
-              profile.companyLogoUrl ||
-              ''
-            ).trim();
-
-            // 1. Work & Corporate Data — automatically filter out unfilled Master Identity fields
-            const availableWorkFields: Array<{
-              key: keyof CardVisibleFields;
-              label: string;
-              desc: string;
-            }> = (
-              [
-                {
-                  key: 'role' as keyof CardVisibleFields,
-                  label: 'Executive Role / Job Title',
-                  desc: (profile.workData?.role || profile.role || '').trim(),
-                },
-                {
-                  key: 'company' as keyof CardVisibleFields,
-                  label: 'Company / Organization',
-                  desc: (profile.workData?.company || profile.company || '').trim(),
-                },
-                {
-                  key: 'companyLogo' as keyof CardVisibleFields,
-                  label: 'Company Logo Badge',
-                  desc: activeLogoVal
-                    ? activeLogoVal.startsWith('data:')
-                      ? 'Custom Uploaded / AI Brand Emblem'
-                      : activeLogoVal
-                    : '',
-                },
-                {
-                  key: 'headline' as keyof CardVisibleFields,
-                  label: 'Executive Headline',
-                  desc: (profile.headline || '').trim(),
-                },
-                {
-                  key: 'department' as keyof CardVisibleFields,
-                  label: 'Department / Division',
-                  desc: (profile.workData?.department || '').trim(),
-                },
-                {
-                  key: 'email' as keyof CardVisibleFields,
-                  label: 'Corporate Direct Email',
-                  desc: (profile.workData?.email || profile.email || '').trim(),
-                },
-                {
-                  key: 'phone' as keyof CardVisibleFields,
-                  label: 'Work Direct Phone / Desk',
-                  desc: (profile.workData?.phone || profile.phone || '').trim(),
-                },
-                {
-                  key: 'officeAddress' as keyof CardVisibleFields,
-                  label: 'Office Address / HQ',
-                  desc: formatAddr(profile.workData?.officeAddress),
-                },
-                {
-                  key: 'taxIdOrVat' as keyof CardVisibleFields,
-                  label: 'Tax ID / Corporate VAT',
-                  desc: (profile.workData?.taxIdOrVat || '').trim(),
-                },
-              ]
-            ).filter((f) => Boolean(f.desc));
-
-            const workFieldKeys = availableWorkFields.map((f) => f.key);
-            const isAllWorkSelected =
-              workFieldKeys.length > 0 &&
-              workFieldKeys.every((k) => activeCard.visibleFields[k] !== false && Boolean(activeCard.visibleFields[k] ?? (k === 'companyLogo')));
-            const activeWorkCount = workFieldKeys.filter(
-              (k) => k === 'companyLogo' ? activeCard.visibleFields.companyLogo !== false : !!activeCard.visibleFields[k]
-            ).length;
-
-            // 2. Personal Data Coordinates — automatically filter out unfilled Master Identity fields
-            const availablePersonalFields: Array<{
-              key: keyof CardVisibleFields;
-              label: string;
-              desc: string;
-            }> = (
-              [
-                {
-                  key: 'personalBio' as keyof CardVisibleFields,
-                  label: 'Personal Bio & About Note',
-                  desc: (profile.personalData?.bio || '').trim(),
-                },
-                {
-                  key: 'personalPhone' as keyof CardVisibleFields,
-                  label: 'Personal Mobile Phone',
-                  desc: (profile.personalData?.phone || '').trim(),
-                },
-                {
-                  key: 'personalEmail' as keyof CardVisibleFields,
-                  label: 'Personal Email (iCloud/Gmail)',
-                  desc: (profile.personalData?.email || '').trim(),
-                },
-                {
-                  key: 'nickname' as keyof CardVisibleFields,
-                  label: 'Nickname / Preferred Name',
-                  desc: (profile.personalData?.nickname || '').trim(),
-                },
-                {
-                  key: 'pronouns' as keyof CardVisibleFields,
-                  label: 'Preferred Pronouns',
-                  desc: (profile.personalData?.pronouns || '').trim(),
-                },
-                {
-                  key: 'gender' as keyof CardVisibleFields,
-                  label: 'Gender Identity',
-                  desc: (profile.personalData?.gender || '').trim(),
-                },
-                {
-                  key: 'homeAddress' as keyof CardVisibleFields,
-                  label: 'Home Residential Address',
-                  desc: formatAddr(profile.personalData?.address),
-                },
-                {
-                  key: 'birthday' as keyof CardVisibleFields,
-                  label: 'Birthday Date (BDAY)',
-                  desc: (profile.personalData?.birthday || '').trim(),
-                },
-                {
-                  key: 'emergencyContact' as keyof CardVisibleFields,
-                  label: `Emergency ICE Contacts (${
-                    (profile.personalData?.emergencyContacts?.filter((c) => c.name || c.phone).length ||
-                      (profile.personalData?.emergencyContact?.name ? 1 : 0))
-                  })`,
-                  desc: formatEmergency(
-                    profile.personalData?.emergencyContact,
-                    profile.personalData?.emergencyContacts
-                  ),
-                },
-              ]
-            ).filter((f) => Boolean(f.desc));
-
-            const personalFieldKeys = availablePersonalFields.map((f) => f.key);
-            const isAllPersonalSelected =
-              personalFieldKeys.length > 0 &&
-              personalFieldKeys.every((k) => !!activeCard.visibleFields[k]);
-            const activePersonalCount = personalFieldKeys.filter(
-              (k) => !!activeCard.visibleFields[k]
-            ).length;
-
-            // 3. Social Media Channels — automatically filter out unfilled social accounts (supports multiple profiles on same platform)
-            const filledSocialEntries = getFilledSocialAccounts(profile);
-            const isAllSocialsSelected =
-              filledSocialEntries.length > 0 &&
-              activeCard.visibleFields.socials !== false &&
-              filledSocialEntries.every((entry) => isSocialAccountVisible(activeCard, entry));
-            const activeSocialsCount =
-              activeCard.visibleFields.socials === false
-                ? 0
-                : filledSocialEntries.filter((entry) => isSocialAccountVisible(activeCard, entry))
-                    .length;
-
-            // 4. General Web, Bio & Story Deck Slide 03 Showcase — automatically filter out unfilled fields
-            const passionsList = (profile.passions || []).filter((p) =>
-              Boolean(p.title?.trim() || p.detail?.trim())
-            );
-            const educationList = (profile.education || []).filter((e) =>
-              Boolean(
-                e.institution?.trim() ||
-                  e.degree?.trim() ||
-                  e.year?.trim() ||
-                  e.honors?.trim()
-              )
-            );
-            const portfolioList = (profile.portfolio || []).filter((item) => {
-              const isUntouchedDefault =
-                item.title === 'New Portfolio Work' &&
-                item.mediumOrRole === 'Mixed Media / Performance' &&
-                item.imageUrl === profile.avatarUrl;
-              if (isUntouchedDefault) return false;
-              return Boolean(
-                item.title?.trim() ||
-                  item.mediumOrRole?.trim() ||
-                  (item as any).roleOrMedium?.trim() ||
-                  item.imageUrl?.trim() ||
-                  item.description?.trim()
-              );
-            });
-
-            const availableGeneralFields: Array<{
-              key: keyof CardVisibleFields;
-              label: string;
-              desc: string;
-            }> = (
-              [
-                {
-                  key: 'website' as keyof CardVisibleFields,
-                  label: 'Official Website / Portfolio',
-                  desc: (profile.website || profile.workData?.website || '').trim(),
-                },
-                {
-                  key: 'location' as keyof CardVisibleFields,
-                  label: 'City Location',
-                  desc: (profile.location || '').trim(),
-                },
-                {
-                  key: 'bio' as keyof CardVisibleFields,
-                  label: 'Work Executive Bio Summary',
-                  desc: (profile.workData?.bio || profile.bio || '').trim(),
-                },
-                {
-                  key: 'passions' as keyof CardVisibleFields,
-                  label: `Hobbies, Sports & Passions (${passionsList.length})`,
-                  desc: passionsList
-                    .map((p) => p.title?.trim() || p.detail?.trim())
-                    .filter(Boolean)
-                    .join(' · '),
-                },
-                {
-                  key: 'education' as keyof CardVisibleFields,
-                  label: `Education & Academic Credentials (${educationList.length})`,
-                  desc: educationList
-                    .map((e) =>
-                      [e.degree?.trim(), e.institution?.trim()].filter(Boolean).join(' — ') ||
-                      e.honors?.trim() ||
-                      e.year?.trim()
-                    )
-                    .filter(Boolean)
-                    .join(' · '),
-                },
-                {
-                  key: 'portfolioSection' as keyof CardVisibleFields,
-                  label: `Artist & Creative Portfolio (${portfolioList.length})`,
-                  desc: portfolioList
-                    .map(
-                      (item) =>
-                        item.title?.trim() ||
-                        item.mediumOrRole?.trim() ||
-                        (item as any).roleOrMedium?.trim() ||
-                        'Artwork'
-                    )
-                    .filter(Boolean)
-                    .join(' · '),
-                },
-              ]
-            ).filter((f) => Boolean(f.desc));
-
-            const generalFieldKeys = availableGeneralFields.map((f) => f.key);
-            const isAllGeneralSelected =
-              generalFieldKeys.length > 0 &&
-              generalFieldKeys.every((k) =>
-                k === 'passions' || k === 'education' || k === 'portfolioSection'
-                  ? activeCard.visibleFields[k] !== false
-                  : !!activeCard.visibleFields[k]
-              );
-            const activeGeneralCount = generalFieldKeys.filter((k) =>
-              k === 'passions' || k === 'education' || k === 'portfolioSection'
-                ? activeCard.visibleFields[k] !== false
-                : !!activeCard.visibleFields[k]
-            ).length;
-
-            return (
-              <div className={`${openAccordions.sharing ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
-                <button
-                  type="button"
-                  onClick={() => toggleAccordion('sharing')}
-                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-slate-800/40 transition"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                      <Eye className="h-4 w-4 text-emerald-400" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs sm:text-sm font-bold text-white truncate">
-                          Selective Sharing & Field Visibility
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 truncate">
-                        Control exactly which filled work, personal, and social fields are visible on "{activeCard.name}"
-                      </p>
-                    </div>
+          <div className={`${openAccordions.beyond ? 'block' : 'hidden lg:block'} rounded-2xl border border-slate-800/90 bg-slate-900/70 overflow-hidden shadow-lg transition`}>
+            <button
+              type="button"
+              onClick={() => toggleAccordion('beyond')}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-slate-800/40 transition"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-9 w-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-4 w-4 text-amber-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-bold text-white truncate">
+                      Passions, Education & Portfolio
+                    </span>
                   </div>
-                  <ChevronDown
-                    className={`h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200 ${
-                      openAccordions.sharing ? 'rotate-180 text-emerald-400' : ''
-                    }`}
-                  />
-                </button>
-
-                {openAccordions.sharing && (
-                  <div className="p-4 sm:p-5 border-t border-slate-800/80 bg-slate-950/40 space-y-5 animate-in fade-in duration-150">
-                    {/* Group 1: Work & Corporate Data */}
-                {availableWorkFields.length > 0 && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
-                    <div className="flex items-center justify-between border-b border-indigo-900/40 pb-2.5">
-                      <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
-                        <Briefcase className="h-3.5 w-3.5 text-indigo-400" />
-                        <span>Work & Corporate Data</span>
-                        <span className="text-[10px] font-mono text-indigo-400/80 font-normal">
-                          ({activeWorkCount}/{workFieldKeys.length})
-                        </span>
-                      </div>
-                      <div
-                        onClick={() => {
-                          const nextState = !isAllWorkSelected;
-                          const updatedFields = { ...activeCard.visibleFields };
-                          workFieldKeys.forEach((k) => {
-                            (updatedFields as any)[k] = nextState;
-                          });
-                          onUpdateCard({
-                            ...activeCard,
-                            visibleFields: updatedFields,
-                          });
-                        }}
-                        className="flex items-center gap-2 cursor-pointer select-none group"
-                      >
-                        <span className="text-[11px] font-medium text-slate-300 group-hover:text-white transition">
-                          {isAllWorkSelected ? 'Unselect All' : 'Select All'}
-                        </span>
-                        <button
-                          type="button"
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            isAllWorkSelected ? 'bg-indigo-600' : 'bg-slate-800'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              isAllWorkSelected ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {availableWorkFields.map((field) => {
-                        const isVisible =
-                          field.key === 'companyLogo'
-                            ? activeCard.visibleFields.companyLogo !== false
-                            : !!activeCard.visibleFields[field.key];
-                        return (
-                          <div
-                            key={field.key}
-                            onClick={() =>
-                              onUpdateCard({
-                                ...activeCard,
-                                visibleFields: {
-                                  ...activeCard.visibleFields,
-                                  [field.key]: !isVisible,
-                                },
-                              })
-                            }
-                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition ${
-                              isVisible
-                                ? 'border-indigo-500/50 bg-indigo-950/30 text-white'
-                                : 'border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300'
-                            }`}
-                          >
-                            <div className="truncate pr-2">
-                              <div className="text-xs font-semibold leading-tight">{field.label}</div>
-                              <div className="text-[11px] text-slate-400 truncate max-w-[200px]">{field.desc}</div>
-                            </div>
-                            <button
-                              type="button"
-                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                isVisible ? 'bg-indigo-600' : 'bg-slate-800'
-                              }`}
-                            >
-                              <span
-                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                  isVisible ? 'translate-x-4' : 'translate-x-0'
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Group 2: Personal Data Coordinates */}
-                {availablePersonalFields.length > 0 && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
-                    <div className="flex items-center justify-between border-b border-rose-900/40 pb-2.5">
-                      <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
-                        <User className="h-3.5 w-3.5 text-rose-400" />
-                        <span>Personal Data Coordinates</span>
-                        <span className="text-[10px] font-mono text-rose-400/80 font-normal">
-                          ({activePersonalCount}/{personalFieldKeys.length})
-                        </span>
-                      </div>
-                      <div
-                        onClick={() => {
-                          const nextState = !isAllPersonalSelected;
-                          const updatedFields = { ...activeCard.visibleFields };
-                          personalFieldKeys.forEach((k) => {
-                            (updatedFields as any)[k] = nextState;
-                          });
-                          onUpdateCard({
-                            ...activeCard,
-                            visibleFields: updatedFields,
-                          });
-                        }}
-                        className="flex items-center gap-2 cursor-pointer select-none group"
-                      >
-                        <span className="text-[11px] font-medium text-slate-300 group-hover:text-white transition">
-                          {isAllPersonalSelected ? 'Unselect All' : 'Select All'}
-                        </span>
-                        <button
-                          type="button"
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            isAllPersonalSelected ? 'bg-rose-600' : 'bg-slate-800'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              isAllPersonalSelected ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {availablePersonalFields.map((field) => {
-                        const isVisible = !!activeCard.visibleFields[field.key];
-                        return (
-                          <div
-                            key={field.key}
-                            onClick={() =>
-                              onUpdateCard({
-                                ...activeCard,
-                                visibleFields: {
-                                  ...activeCard.visibleFields,
-                                  [field.key]: !isVisible,
-                                },
-                              })
-                            }
-                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition ${
-                              isVisible
-                                ? 'border-rose-500/50 bg-rose-950/30 text-white'
-                                : 'border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300'
-                            }`}
-                          >
-                            <div className="truncate pr-2">
-                              <div className="text-xs font-semibold leading-tight">{field.label}</div>
-                              <div className="text-[11px] text-slate-400 truncate max-w-[200px]">{field.desc}</div>
-                            </div>
-                            <button
-                              type="button"
-                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                isVisible ? 'bg-rose-600' : 'bg-slate-800'
-                              }`}
-                            >
-                              <span
-                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                  isVisible ? 'translate-x-4' : 'translate-x-0'
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Group 3: Major Social Media Channels to Share */}
-                {filledSocialEntries.length > 0 && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-cyan-900/40 pb-2.5">
-                      <div className="flex items-center gap-2 text-xs font-bold text-cyan-300">
-                        <Globe className="h-4 w-4 text-cyan-400" />
-                        <span>
-                          Major Social Media Symbols ({activeSocialsCount}/{filledSocialEntries.length} Displayed on Card)
-                        </span>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                        {/* Preset quick filters */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nextSocialAccounts: Record<string, boolean> = {
-                              ...(activeCard.visibleFields.socialAccounts || {}),
-                            };
-                            const newFields = { ...activeCard.visibleFields, socials: true };
-                            const proList: Array<keyof typeof profile.socials> = ['linkedin', 'twitter', 'github', 'calendly', 'substack', 'medium', 'behance', 'dribbble'];
-                            filledSocialEntries.forEach((entry) => {
-                              const match = proList.includes(entry.platformId);
-                              nextSocialAccounts[entry.id] = match;
-                              newFields[entry.platformId] = match;
-                            });
-                            newFields.socialAccounts = nextSocialAccounts;
-                            onUpdateCard({ ...activeCard, visibleFields: newFields });
-                          }}
-                          className="px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800 hover:bg-indigo-900/60 transition"
-                        >
-                          💼 Business
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nextSocialAccounts: Record<string, boolean> = {
-                              ...(activeCard.visibleFields.socialAccounts || {}),
-                            };
-                            const newFields = { ...activeCard.visibleFields, socials: true };
-                            const persList: Array<keyof typeof profile.socials> = ['whatsapp', 'telegram', 'signal', 'instagram', 'facebook', 'snapchat', 'wechat'];
-                            filledSocialEntries.forEach((entry) => {
-                              const match = persList.includes(entry.platformId);
-                              nextSocialAccounts[entry.id] = match;
-                              newFields[entry.platformId] = match;
-                            });
-                            newFields.socialAccounts = nextSocialAccounts;
-                            onUpdateCard({ ...activeCard, visibleFields: newFields });
-                          }}
-                          className="px-2 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800 hover:bg-rose-900/60 transition"
-                        >
-                          🏠 Personal
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nextSocialAccounts: Record<string, boolean> = {
-                              ...(activeCard.visibleFields.socialAccounts || {}),
-                            };
-                            const newFields = { ...activeCard.visibleFields, socials: true };
-                            const creatorList: Array<keyof typeof profile.socials> = ['youtube', 'tiktok', 'threads', 'discord', 'reddit', 'twitch', 'spotify', 'pinterest'];
-                            filledSocialEntries.forEach((entry) => {
-                              const match = creatorList.includes(entry.platformId);
-                              nextSocialAccounts[entry.id] = match;
-                              newFields[entry.platformId] = match;
-                            });
-                            newFields.socialAccounts = nextSocialAccounts;
-                            onUpdateCard({ ...activeCard, visibleFields: newFields });
-                          }}
-                          className="px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800 hover:bg-amber-900/60 transition"
-                        >
-                          🎮 Creator
-                        </button>
-
-                        <span className="text-slate-700">|</span>
-
-                        {/* Select / Unselect All Toggle */}
-                        <div
-                          onClick={() => {
-                            const nextState = !isAllSocialsSelected;
-                            const nextSocialAccounts: Record<string, boolean> = {
-                              ...(activeCard.visibleFields.socialAccounts || {}),
-                            };
-                            const newFields = {
-                              ...activeCard.visibleFields,
-                              socials: nextState,
-                            };
-                            filledSocialEntries.forEach((entry) => {
-                              nextSocialAccounts[entry.id] = nextState;
-                              newFields[entry.platformId] = nextState;
-                            });
-                            newFields.socialAccounts = nextSocialAccounts;
-                            onUpdateCard({ ...activeCard, visibleFields: newFields });
-                          }}
-                          className="flex items-center gap-2 cursor-pointer select-none group"
-                        >
-                          <span className="text-[11px] font-medium text-slate-300 group-hover:text-white transition">
-                            {isAllSocialsSelected ? 'Unselect All' : 'Select All'}
-                          </span>
-                          <button
-                            type="button"
-                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                              isAllSocialsSelected ? 'bg-cyan-600' : 'bg-slate-800'
-                            }`}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                isAllSocialsSelected ? 'translate-x-4' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <p className="text-[11px] text-slate-400">
-                      Each enabled social channel (including multiple profiles on the same network) appears on "{activeCard.name}" as a touchable icon symbol that opens the page directly when tapped.
-                    </p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                      {filledSocialEntries.map((entry) => {
-                        const platform = getPlatformConfig(entry.platformId);
-                        const val = entry.value.trim();
-                        const isEnabledToggle = isSocialAccountVisible(activeCard, entry);
-
-                        return (
-                          <div
-                            key={entry.id}
-                            onClick={() => {
-                              const nextVal = !isEnabledToggle;
-                              const nextSocialAccounts: Record<string, boolean> = {
-                                ...(activeCard.visibleFields.socialAccounts || {}),
-                                [entry.id]: nextVal,
-                              };
-                              onUpdateCard({
-                                ...activeCard,
-                                visibleFields: {
-                                  ...activeCard.visibleFields,
-                                  socials: true,
-                                  [entry.platformId]: nextVal,
-                                  socialAccounts: nextSocialAccounts,
-                                },
-                              });
-                            }}
-                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition ${
-                              isEnabledToggle
-                                ? 'border-cyan-500/50 bg-cyan-950/20 text-white shadow-sm'
-                                : 'border-slate-800 bg-slate-900/50 text-slate-500 hover:text-slate-300'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                              <div
-                                className="p-1.5 rounded-md flex items-center justify-center shrink-0 border"
-                                style={{
-                                  backgroundColor: `${platform.color}15`,
-                                  borderColor: `${platform.color}35`,
-                                  color: platform.color,
-                                }}
-                              >
-                                {platform.renderIcon({ className: 'h-4 w-4', style: { color: platform.color } })}
-                              </div>
-                              <div className="min-w-0 truncate">
-                                <div className="text-xs font-semibold leading-tight flex items-center gap-1.5">
-                                  <span className="truncate">{platform.name}</span>
-                                  {entry.label?.trim() && (
-                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 shrink-0">
-                                      {entry.label.trim()}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-[11px] text-slate-400 truncate max-w-[170px]">
-                                  {val}
-                                </div>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                isEnabledToggle ? 'bg-cyan-600' : 'bg-slate-800'
-                              }`}
-                            >
-                              <span
-                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                  isEnabledToggle ? 'translate-x-4' : 'translate-x-0'
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Group 4: General Coordinates */}
-                {availableGeneralFields.length > 0 && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                      <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-                        <Globe className="h-3.5 w-3.5 text-cyan-400" />
-                        <span>General Web & Summary Details</span>
-                        <span className="text-[10px] font-mono text-cyan-400/80 font-normal">
-                          ({activeGeneralCount}/{generalFieldKeys.length})
-                        </span>
-                      </div>
-                      <div
-                        onClick={() => {
-                          const nextState = !isAllGeneralSelected;
-                          const updatedFields = { ...activeCard.visibleFields };
-                          generalFieldKeys.forEach((k) => {
-                            (updatedFields as any)[k] = nextState;
-                          });
-                          onUpdateCard({
-                            ...activeCard,
-                            visibleFields: updatedFields,
-                          });
-                        }}
-                        className="flex items-center gap-2 cursor-pointer select-none group"
-                      >
-                        <span className="text-[11px] font-medium text-slate-300 group-hover:text-white transition">
-                          {isAllGeneralSelected ? 'Unselect All' : 'Select All'}
-                        </span>
-                        <button
-                          type="button"
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            isAllGeneralSelected ? 'bg-cyan-600' : 'bg-slate-800'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              isAllGeneralSelected ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      {availableGeneralFields.map((field) => {
-                        const isVisible =
-                          field.key === 'passions' ||
-                          field.key === 'education' ||
-                          field.key === 'portfolioSection'
-                            ? activeCard.visibleFields[field.key] !== false
-                            : !!activeCard.visibleFields[field.key];
-                        return (
-                          <div
-                            key={field.key}
-                            onClick={() =>
-                              onUpdateCard({
-                                ...activeCard,
-                                visibleFields: {
-                                  ...activeCard.visibleFields,
-                                  [field.key]: !isVisible,
-                                },
-                              })
-                            }
-                            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition ${
-                              isVisible
-                                ? 'border-cyan-500/50 bg-cyan-950/30 text-white'
-                                : 'border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300'
-                            }`}
-                          >
-                            <div className="truncate pr-2">
-                              <div className="text-xs font-semibold leading-tight">{field.label}</div>
-                              <div className="text-[10px] text-slate-400 truncate max-w-[150px]">{field.desc}</div>
-                            </div>
-                            <button
-                              type="button"
-                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                isVisible ? 'bg-cyan-600' : 'bg-slate-800'
-                              }`}
-                            >
-                              <span
-                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                  isVisible ? 'translate-x-4' : 'translate-x-0'
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                  </div>
-                )}
+                  <p className="text-[11px] text-slate-400 truncate">
+                    Hobbies & sports, academic credentials, and creative portfolio works
+                  </p>
+                </div>
               </div>
-            );
-          })()}
+              <ChevronDown
+                className={`h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200 ${
+                  openAccordions.beyond ? 'rotate-180 text-amber-400' : ''
+                }`}
+              />
+            </button>
+            {openAccordions.beyond && (
+              <div className="p-4 sm:p-5 border-t border-slate-800/80 bg-slate-950/40">
+                <MasterProfileEditor
+                  sectionMode="beyond"
+                  profile={profile}
+                  activeCard={activeCard}
+                  onUpdateProfile={onUpdateProfile}
+                  onUpdateCard={onUpdateCard}
+                  onConsumeAiCoin={onConsumeAiCoin}
+                  onOpenKYCModal={() => setIsKYCModalOpen(true)}
+                  onOpenBioModal={() => setIsBioModalOpen(true)}
+                  onOpenImageHub={(sub) => {
+                    setOpenAccordions((prev) => ({
+                      ...prev,
+                      portrait: sub !== 'background',
+                      background: sub === 'background',
+                    }));
+                  }}
+                  onOpenAvatarModal={(tab) => {
+                    setAvatarModalTab(tab);
+                    setIsAvatarModalOpen(true);
+                  }}
+                />
+              </div>
+            )}
+          </div>
 
-        </div>
+          {/* ================================================================= */}
+                  </div>
       </div>
 
       {/* AI Bio Generator Modal */}

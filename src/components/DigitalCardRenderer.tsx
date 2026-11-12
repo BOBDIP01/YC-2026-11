@@ -158,13 +158,16 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
   // Multi-Plane Field Depth disabled for full-card chassis, while 3D Silhouette Stage uses optical field depth
   const parallaxEnabled = false;
 
+  // Effective card avatar: uses card-specific portrait if customized, falling back to master profile avatar
+  const effectiveAvatarUrl = card.avatarUrl || profile.avatarUrl;
+
   // 3D Photorealistic Silhouette & Spatial Depth Stage State
-  const [silhouetteCutoutUrl, setSilhouetteCutoutUrl] = useState<string>(profile.avatarUrl);
+  const [silhouetteCutoutUrl, setSilhouetteCutoutUrl] = useState<string>(card.silhouetteCutoutUrl || effectiveAvatarUrl);
   const [portrait3DStageUrl, setPortrait3DStageUrl] = useState<string>('');
 
   useEffect(() => {
-    setSilhouetteCutoutUrl(profile.avatarUrl);
-  }, [profile.avatarUrl]);
+    setSilhouetteCutoutUrl(card.silhouetteCutoutUrl || effectiveAvatarUrl);
+  }, [card.silhouetteCutoutUrl, effectiveAvatarUrl]);
 
   // Story Deck Slide State (0 = Identity, 1 = Spotlight, 2 = Beyond & Portfolio)
   const [storySlide, setStorySlide] = useState<number>(0);
@@ -834,9 +837,9 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
           }
         }}
       >
-        {profile.avatarUrl ? (
+        {effectiveAvatarUrl ? (
           <img
-            src={profile.avatarUrl}
+            src={effectiveAvatarUrl}
             alt={profile.name}
             draggable={false}
             className="w-full h-full object-cover pointer-events-none transition-transform duration-75"
@@ -1512,9 +1515,9 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                         }
                       }}
                     >
-                      {silhouetteCutoutUrl || profile.avatarUrl ? (
+                      {silhouetteCutoutUrl || effectiveAvatarUrl ? (
                         <img
-                          src={silhouetteCutoutUrl || profile.avatarUrl}
+                          src={silhouetteCutoutUrl || effectiveAvatarUrl}
                           alt={profile.name}
                           draggable={false}
                           className="relative z-10 w-full h-full object-contain object-bottom select-none pointer-events-none transition-transform duration-75"
@@ -2806,9 +2809,9 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                         }
                       }}
                     >
-                      {silhouetteCutoutUrl || profile.avatarUrl ? (
+                      {silhouetteCutoutUrl || effectiveAvatarUrl ? (
                         <img
-                          src={silhouetteCutoutUrl || profile.avatarUrl}
+                          src={silhouetteCutoutUrl || effectiveAvatarUrl}
                           alt={profile.name}
                           draggable={false}
                           className="w-full h-full object-contain object-bottom pointer-events-none transition-transform duration-75"

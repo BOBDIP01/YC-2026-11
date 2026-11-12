@@ -769,23 +769,6 @@ export default function App() {
 
   const handleSelectCard = (card: DigitalCard) => {
     setActiveCardId(card.id);
-    const cardPersonaMap: Record<string, string> = {
-      'card-executive': 'persona-founder',
-      'card-family': 'persona-family',
-      'card-golf': 'persona-golf',
-      'card-soccer': 'persona-soccer',
-    };
-    const mappedPersonaId = cardPersonaMap[card.id];
-    if (mappedPersonaId && personas.some((p) => p.id === mappedPersonaId)) {
-      setActivePersonaId(mappedPersonaId);
-      return;
-    }
-    const matchingPersona = personas.find(
-      (p) => p.id === card.id || p.circleName === card.name || p.profileTitle === card.name
-    );
-    if (matchingPersona) {
-      setActivePersonaId(matchingPersona.id);
-    }
   };
 
   const handleUpdateProfile = (updated: MasterProfile) => {
