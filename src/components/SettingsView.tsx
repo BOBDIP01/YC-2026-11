@@ -1524,6 +1524,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                                 <p className="text-[11px] text-slate-400">{spec.tagline}</p>
                                 <div className="space-y-1.5 pt-2 border-t border-slate-800/80 text-[11px] text-slate-300">
                                   <div>• <strong>Cards:</strong> {spec.maxCardsLabel}</div>
+                                  <div>• <strong>Image Hub:</strong> {spec.maxImageHubPicturesLabel}</div>
                                   <div>• <strong>AI Quota:</strong> {spec.aiPowerLabel}</div>
                                   <div>• <strong>P2P Radar:</strong> {spec.radarLimitLabel}</div>
                                   <div>• <strong>Room Cap:</strong> {spec.radarRoomMaxParticipantsLabel}</div>

@@ -24,6 +24,8 @@ export interface TierSpec {
   radarLimitLabel: string;
   maxRoomParticipants: number; // 5 for Free, 0 (Unlimited) for Basic & Business
   radarRoomMaxParticipantsLabel: string;
+  maxImageHubPictures: number; // 3 for Free, 5 for Basic, 50 for Business
+  maxImageHubPicturesLabel: string;
   features: string[];
 }
 
@@ -51,8 +53,11 @@ export const SUBSCRIPTION_TIER_SPECS: Record<SubscriptionTier, TierSpec> = {
     radarLimitLabel: '1 Session / Week',
     maxRoomParticipants: 5,
     radarRoomMaxParticipantsLabel: 'Max 5 Connected Persons',
+    maxImageHubPictures: 3,
+    maxImageHubPicturesLabel: '3 Stored Images Max (Profile / Background)',
     features: [
       'Up to 2 Digital Business Cards maximum',
+      'Image Hub: Store up to 3 profile photos & 3 background covers',
       '0 Included AI Quota (can buy 50-Coin AI Booster Pack · valid 3 months)',
       'P2P Radar: 1 session per week',
       'Create Radar Rooms for up to 5 connected persons max',
@@ -78,8 +83,11 @@ export const SUBSCRIPTION_TIER_SPECS: Record<SubscriptionTier, TierSpec> = {
     radarLimitLabel: 'Unlimited P2P Radar',
     maxRoomParticipants: 0, // 0 = Unlimited
     radarRoomMaxParticipantsLabel: 'Unlimited Room Participants',
+    maxImageHubPictures: 5,
+    maxImageHubPicturesLabel: '5 Stored Images Max (Profile / Background)',
     features: [
       'All Free tier features + Unlimited Digital Cards',
+      'Image Hub: Store up to 5 profile photos & 5 background covers',
       '5 AI Quota Coins / day included (for any AI utilization)',
       'Non-cumulative quota: remaining monthly coins do NOT roll over to next month',
       'Supports 50-Coin AI Booster Pack (valid 3 months from purchase)',
@@ -105,8 +113,11 @@ export const SUBSCRIPTION_TIER_SPECS: Record<SubscriptionTier, TierSpec> = {
     radarLimitLabel: 'Unlimited P2P Radar',
     maxRoomParticipants: 0, // 0 = Unlimited
     radarRoomMaxParticipantsLabel: 'Unlimited Room Participants',
+    maxImageHubPictures: 50,
+    maxImageHubPicturesLabel: '50 Stored Images Max (Profile / Background)',
     features: [
       'Everything in Basic + Full Business CRM & After-Sales Hub',
+      'Image Hub: Store up to 50 profile photos & 50 background covers',
       '10 AI Image Generations / day included (non-cumulative · no monthly rollover)',
       'Full AI Power for CRM Support, Social Scanning, Reasoning & Text Writing (Unlimited up to Google service limits)',
       'Supports 50-Coin AI Booster Pack (valid 3 months) for extra AI image generations',
@@ -511,4 +522,107 @@ export function purchaseAiBoosterPack(
     boosterPacksPurchasedCount: (state.boosterPacksPurchasedCount || 0) + 1,
     boosterExpiresAt: nextPacks[0].expiresAt,
   });
+}
+
+/**
+ * Image Hub storage limit per category (Profile Photos or Cover Backgrounds):
+ * Free: 3, Basic: 5, Business: 50
+ */
+export function getImageHubLimit(tier: SubscriptionTier = 'free'): number {
+  const spec = SUBSCRIPTION_TIER_SPECS[tier] || SUBSCRIPTION_TIER_SPECS.free;
+  return spec.maxImageHubPictures || 3;
+}
+
+/**
+ * Counts stored images in profile for a specific category ('avatar' | 'banner' | 'all')
+ */
+export function countHubImages(
+  profile?: { storedPictures?: Array<{ url?: string; context?: string; category?: string; aspectRatio?: string }>; storedBanners?: Array<{ url?: string }> } | null,
+  type: 'avatar' | 'banner' | 'all' = 'all'
+): number {
+  if (!profile) return 0;
+  const storedPics = (profile.storedPictures || []).filter((p) => Boolean(p && p.url && p.url.trim().length > 0));
+  const storedBans = (profile.storedBanners || []).filter((b) => Boolean(b && b.url && b.url.trim().length > 0));
+
+  if (type === 'avatar') {
+    return storedPics.filter(
+      (p) => p.context !== 'banner' && p.category !== 'banner' && p.aspectRatio !== '16:9'
+    ).length;
+  }
+
+  if (type === 'banner') {
+    const combined = [
+      ...storedBans,
+      ...storedPics.filter((p) => p.context === 'banner' || p.category === 'banner' || p.aspectRatio === '16:9'),
+    ];
+    return combined.filter((b, idx, arr) => arr.findIndex((x) => x.url?.trim() === b.url?.trim()) === idx).length;
+  }
+
+  const combined = [
+    ...storedPics,
+    ...storedBans.map((b) => ({ ...b, context: 'banner', aspectRatio: '16:9' })),
+  ];
+  return combined.filter((p, idx, arr) => arr.findIndex((x) => x.url?.trim() === p.url?.trim()) === idx).length;
+}
+
+/**
+ * Checks if a new image can be added to the Image Hub for the given category.
+ * If the image is already saved (matching URL), addition is allowed without penalty.
+ */
+export function checkImageHubQuota(
+  profile?: { storedPictures?: Array<{ url?: string; context?: string; category?: string; aspectRatio?: string }>; storedBanners?: Array<{ url?: string }> } | null,
+  tier: SubscriptionTier = 'free',
+  type: 'avatar' | 'banner' = 'avatar',
+  incomingUrl?: string
+): {
+  allowed: boolean;
+  currentCount: number;
+  maxAllowed: number;
+  tier: SubscriptionTier;
+  reason?: string;
+} {
+  const maxAllowed = getImageHubLimit(tier);
+  const currentCount = countHubImages(profile, type);
+
+  // If already present in vault, replacing or re-selecting it is always allowed
+  if (incomingUrl && incomingUrl.trim().length > 0) {
+    const cleanUrl = incomingUrl.trim();
+    if (type === 'avatar') {
+      const exists = (profile?.storedPictures || []).some(
+        (p) => p.url?.trim() === cleanUrl && p.context !== 'banner' && p.aspectRatio !== '16:9'
+      );
+      if (exists) {
+        return { allowed: true, currentCount, maxAllowed, tier };
+      }
+    } else {
+      const bannerMatches = [
+        ...(profile?.storedBanners || []),
+        ...(profile?.storedPictures?.filter((p) => p.context === 'banner' || p.aspectRatio === '16:9') || []),
+      ];
+      const exists = bannerMatches.some((b) => b.url?.trim() === cleanUrl);
+      if (exists) {
+        return { allowed: true, currentCount, maxAllowed, tier };
+      }
+    }
+  }
+
+  const typeLabel = type === 'avatar' ? 'profile photos' : 'cover backgrounds';
+
+  if (currentCount >= maxAllowed) {
+    const nextTier = tier === 'free' ? 'Basic (5 images)' : tier === 'basic' ? 'Business (50 images)' : 'Business Enterprise';
+    return {
+      allowed: false,
+      currentCount,
+      maxAllowed,
+      tier,
+      reason: `Image Hub storage limit reached (${currentCount}/${maxAllowed} ${typeLabel}). Your ${SUBSCRIPTION_TIER_SPECS[tier]?.name || 'Free'} plan includes up to ${maxAllowed} images. Upgrade to ${nextTier} or remove an existing picture to store more.`,
+    };
+  }
+
+  return {
+    allowed: true,
+    currentCount,
+    maxAllowed,
+    tier,
+  };
 }

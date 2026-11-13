@@ -508,6 +508,12 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                             {spec.hasCrmAccess ? 'Full Access' : 'Locked'}
                           </span>
                         </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Image Hub Vault:</span>
+                          <span className="font-bold text-indigo-300">
+                            {spec.maxImageHubPictures} Images Max
+                          </span>
+                        </div>
                       </div>
 
                       <ul className="space-y-2 text-xs text-slate-300">

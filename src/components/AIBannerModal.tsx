@@ -179,13 +179,15 @@ export const AIBannerModal: React.FC<AIBannerModalProps> = ({
   const handleSaveOnlyToHub = () => {
     if (!generatedBannerUrl) return;
     if (onSaveToImageHub) {
-      onSaveToImageHub({
+      const res = (onSaveToImageHub as any)({
         url: generatedBannerUrl,
         name: bannerTitle.trim() || 'AI Generated Banner',
         style: selectedStyle,
       });
-      setSaveSuccessMsg('Cover banner saved to your Image Hub!');
-      setTimeout(() => setSaveSuccessMsg(null), 3000);
+      if (res !== false) {
+        setSaveSuccessMsg('Cover banner saved to your Image Hub!');
+        setTimeout(() => setSaveSuccessMsg(null), 3000);
+      }
     }
   };
 

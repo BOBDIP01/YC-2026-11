@@ -8,6 +8,12 @@ import { PROFILE_CATEGORIES, COVER_BANNER_PRESETS, LandscapePresetCategory, PERS
 import { extractPersonSilhouetteCutout } from '../utils/silhouetteExtractor';
 import { enhancePhotoWithAI, AvatarStyle } from '../utils/aiPhotoEnhancer';
 import {
+  checkImageHubQuota,
+  getImageHubLimit,
+  countHubImages,
+  SUBSCRIPTION_TIER_SPECS,
+} from '../utils/subscription';
+import {
   MAJOR_SOCIAL_PLATFORMS,
   getFullSocialUrl,
   getProfileSocialValue,
@@ -126,6 +132,11 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   onConsumeAiCoin,
   onOpenSubscriptionModal,
 }) => {
+  const currentTier = subscription?.tier || 'free';
+  const tierImageLimit = getImageHubLimit(currentTier);
+  const avatarHubCount = countHubImages(profile, 'avatar');
+  const bannerHubCount = countHubImages(profile, 'banner');
+
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [qrMode, setQrMode] = useState<'vcard' | 'weblink'>('weblink');
   const [copiedLink, setCopiedLink] = useState(false);
@@ -379,6 +390,15 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   const handleUploadProfilePhotoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const quota = checkImageHubQuota(profile, currentTier, 'avatar');
+    if (!quota.allowed) {
+      setAvatarCreationStatus(quota.reason || 'Image Hub limit reached.');
+      onOpenSubscriptionModal?.(quota.reason);
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       const rawDataUrl = reader.result as string;
@@ -430,6 +450,13 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   const handleRecreate3DAvatar = async () => {
     const currentActivePortrait = activeCard.avatarUrl || profile.avatarUrl;
     if (isRecreating3DAvatar || !currentActivePortrait) return;
+
+    const quota = checkImageHubQuota(profile, currentTier, 'avatar');
+    if (!quota.allowed) {
+      setAvatarCreationStatus(quota.reason || 'Image Hub limit reached.');
+      onOpenSubscriptionModal?.(quota.reason);
+      return;
+    }
 
     const headshotStyleIds = ['executive', 'casual', 'country_club', 'athletic', 'cyber', 'editorial', 'custom_only'];
     const isHeadshotPreset = headshotStyleIds.includes(avatarStylePreset);
@@ -714,6 +741,15 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   const handleUploadCustomBackdropFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const quota = checkImageHubQuota(profile, currentTier, 'banner');
+    if (!quota.allowed) {
+      setAvatarCreationStatus(quota.reason || 'Image Hub storage limit reached.');
+      onOpenSubscriptionModal?.(quota.reason);
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       const rawDataUrl = reader.result as string;
@@ -1008,6 +1044,13 @@ export const CardStudio: React.FC<CardStudioProps> = ({
 
   // Save new banner into the user's Image Hub
   const handleSaveBannerToImageHub = (banner: { url: string; name: string; style: string }) => {
+    const quota = checkImageHubQuota(profile, currentTier, 'banner', banner.url);
+    if (!quota.allowed) {
+      setAvatarCreationStatus(quota.reason || 'Image Hub limit reached.');
+      onOpenSubscriptionModal?.(quota.reason);
+      return false;
+    }
+
     const newBannerItem: StoredPicture = {
       id: `banner-${Date.now()}`,
       name: banner.name,
@@ -1131,6 +1174,13 @@ export const CardStudio: React.FC<CardStudioProps> = ({
     if (e) e.preventDefault();
     const clean = inlineBannerPrompt.trim();
     if (!clean || isGeneratingInlineBanner) return;
+
+    const quota = checkImageHubQuota(profile, currentTier, 'banner');
+    if (!quota.allowed) {
+      setAvatarCreationStatus(quota.reason || 'Image Hub storage limit reached.');
+      onOpenSubscriptionModal?.(quota.reason);
+      return;
+    }
 
     if (onConsumeAiCoin) {
       const allowed = onConsumeAiCoin(
@@ -3096,7 +3146,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                             </span>
                             <span className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-lg bg-black/80 py-1 text-[10px] font-semibold text-indigo-200 group-hover:bg-indigo-600 group-hover:text-white transition">
                               <Layers className="h-3 w-3 shrink-0" />
-                              <span>Saved ({profileAvatarsVault.length})</span>
+                              <span>Saved ({profileAvatarsVault.length}/{tierImageLimit})</span>
                             </span>
                           </button>
                           {activeCard.avatarUrl && activeCard.avatarUrl !== profile.avatarUrl && (
@@ -3154,16 +3204,36 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                               }`}
                             >
                               <Layers className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                              <span className="truncate">Saved ({profileAvatarsVault.length})</span>
+                              <span className="truncate">Saved ({profileAvatarsVault.length}/{tierImageLimit})</span>
                             </button>
 
                             <button
                               type="button"
-                              onClick={() => profilePhotoFileInputRef.current?.click()}
-                              className="h-9 px-2.5 w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm transition"
+                              onClick={() => {
+                                if (profileAvatarsVault.length >= tierImageLimit) {
+                                  setAvatarCreationStatus(
+                                    `Headshot storage limit reached (${profileAvatarsVault.length}/${tierImageLimit} on ${currentTier} plan). Upgrade to store more.`
+                                  );
+                                  onOpenSubscriptionModal?.(
+                                    `Image Hub Limit: ${currentTier} plan includes up to ${tierImageLimit} stored headshots (3 for Free, 5 for Basic, 50 for Business). Upgrade to store more.`
+                                  );
+                                  return;
+                                }
+                                profilePhotoFileInputRef.current?.click();
+                              }}
+                              className={`h-9 px-2.5 w-full rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm transition ${
+                                profileAvatarsVault.length >= tierImageLimit
+                                  ? 'bg-amber-600/20 border border-amber-500/40 text-amber-200 hover:bg-amber-600/30'
+                                  : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                              }`}
+                              title={
+                                profileAvatarsVault.length >= tierImageLimit
+                                  ? `Storage limit reached (${profileAvatarsVault.length}/${tierImageLimit} on ${currentTier} plan)`
+                                  : 'Upload Portrait'
+                              }
                             >
                               <Camera className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">Upload</span>
+                              <span className="truncate">{profileAvatarsVault.length >= tierImageLimit ? 'Limit' : 'Upload'}</span>
                             </button>
 
                             <button
@@ -3589,7 +3659,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                             </span>
                             <span className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-lg bg-black/80 py-1 text-[10px] font-semibold text-cyan-200 group-hover:bg-cyan-600 group-hover:text-white transition">
                               <Layers className="h-3 w-3 shrink-0" />
-                              <span>Saved ({hubBanners.length})</span>
+                              <span>Saved ({hubBanners.length}/{tierImageLimit})</span>
                             </span>
                           </button>
                         </div>
@@ -3619,16 +3689,36 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                               }`}
                             >
                               <Layers className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-                              <span className="truncate">Saved ({hubBanners.length})</span>
+                              <span className="truncate">Saved ({hubBanners.length}/{tierImageLimit})</span>
                             </button>
 
                             <button
                               type="button"
-                              onClick={() => backdropFileInputRef.current?.click()}
-                              className="h-9 px-2.5 w-full rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm transition"
+                              onClick={() => {
+                                if (hubBanners.length >= tierImageLimit) {
+                                  setAvatarCreationStatus(
+                                    `Cover banner limit reached (${hubBanners.length}/${tierImageLimit} on ${currentTier} plan). Upgrade to store more.`
+                                  );
+                                  onOpenSubscriptionModal?.(
+                                    `Image Hub Limit: ${currentTier} plan includes up to ${tierImageLimit} stored cover banners (3 for Free, 5 for Basic, 50 for Business). Upgrade to store more.`
+                                  );
+                                  return;
+                                }
+                                backdropFileInputRef.current?.click();
+                              }}
+                              className={`h-9 px-2.5 w-full rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm transition ${
+                                hubBanners.length >= tierImageLimit
+                                  ? 'bg-amber-600/20 border border-amber-500/40 text-amber-200 hover:bg-amber-600/30'
+                                  : 'bg-cyan-600 hover:bg-cyan-500 text-white'
+                              }`}
+                              title={
+                                hubBanners.length >= tierImageLimit
+                                  ? `Storage limit reached (${hubBanners.length}/${tierImageLimit} on ${currentTier} plan)`
+                                  : 'Upload Backdrop'
+                              }
                             >
                               <Camera className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">Upload</span>
+                              <span className="truncate">{hubBanners.length >= tierImageLimit ? 'Limit' : 'Upload'}</span>
                             </button>
 
                             {activeCard.coverBannerUrl && (

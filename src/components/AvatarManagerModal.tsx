@@ -1,7 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MasterProfile, StoredPicture, SubscriptionState, AiUsageType } from '../types';
 import { enhancePhotoWithAI } from '../utils/aiPhotoEnhancer';
-import { getQuotaSummary } from '../utils/subscription';
+import {
+  getQuotaSummary,
+  checkImageHubQuota,
+  getImageHubLimit,
+  countHubImages,
+  SUBSCRIPTION_TIER_SPECS,
+} from '../utils/subscription';
 import { apiFetch } from '../utils/apiConfig';
 import {
   Sparkles,
@@ -126,6 +132,13 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
     if (vaultAssetFilter === 'avatars') return !isBanner;
     return true;
   });
+
+  const currentTier = subscription?.tier || 'free';
+  const tierLimit = getImageHubLimit(currentTier);
+  const avatarCount = allHubAssets.filter((p) => p.context !== 'banner' && p.aspectRatio !== '16:9').length;
+  const bannerCount = allHubAssets.filter((p) => p.context === 'banner' || p.aspectRatio === '16:9').length;
+  const isAvatarFull = avatarCount >= tierLimit;
+  const isBannerFull = bannerCount >= tierLimit;
 
   // Deduplicate source photos so that the active profile photo and stored vault pictures
   // never appear twice, and order remains fixed while the modal is open.
@@ -331,6 +344,13 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
       return;
     }
 
+    const quota = checkImageHubQuota(profile, currentTier, 'avatar');
+    if (!quota.allowed) {
+      setErrorMsg(quota.reason || 'Image Hub storage limit reached.');
+      onOpenSubscriptionModal?.(quota.reason);
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
@@ -368,6 +388,13 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
   // 4. Save Captured Camera Photo into Vault (Deduplicated by URL)
   const handleSaveCameraPhoto = (mode: 'avatar' | 'vault-only' | 'modify' = 'avatar') => {
     if (!capturedPhoto) return;
+
+    const quota = checkImageHubQuota(profile, currentTier, 'avatar', capturedPhoto);
+    if (!quota.allowed) {
+      setErrorMsg(quota.reason || 'Image Hub storage limit reached.');
+      onOpenSubscriptionModal?.(quota.reason);
+      return;
+    }
 
     const existingMatch = storedPictures.find((p) => p.url === capturedPhoto);
     const newPic: StoredPicture = existingMatch || {
@@ -585,6 +612,13 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
   // 7. Save to Vault Only (preserve image in vault without applying as active avatar)
   const handleSaveToVaultOnly = () => {
     if (!generatedPreview) return;
+    const quota = checkImageHubQuota(profile, currentTier, 'avatar', generatedPreview.url);
+    if (!quota.allowed) {
+      setErrorMsg(quota.reason || 'Image Hub storage limit reached.');
+      onOpenSubscriptionModal?.(quota.reason);
+      return;
+    }
+
     const newPic: StoredPicture = {
       id: `pic-ai-${Date.now()}`,
       name: generatedPreview.name,
@@ -613,6 +647,13 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
   // 8. Apply AI Headshot to profile and save in Vault
   const handleApplyGenerated = () => {
     if (!generatedPreview) return;
+    const quota = checkImageHubQuota(profile, currentTier, 'avatar', generatedPreview.url);
+    if (!quota.allowed) {
+      setErrorMsg(quota.reason || 'Image Hub storage limit reached.');
+      onOpenSubscriptionModal?.(quota.reason);
+      return;
+    }
+
     const newPic: StoredPicture = {
       id: `pic-ai-${Date.now()}`,
       name: generatedPreview.name,
@@ -836,11 +877,23 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
                     </button>
                   )}
                   <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 transition shadow-sm"
+                    onClick={() => {
+                      if (isAvatarFull) {
+                        setErrorMsg(`Headshots limit reached (${avatarCount}/${tierLimit} on ${currentTier} plan). Delete an existing photo or upgrade to store more.`);
+                        onOpenSubscriptionModal?.(`Headshots storage full (${avatarCount}/${tierLimit}). Upgrade to store more.`);
+                        return;
+                      }
+                      fileInputRef.current?.click();
+                    }}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition shadow-sm ${
+                      isAvatarFull
+                        ? 'bg-amber-600/20 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30'
+                        : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                    }`}
+                    title={isAvatarFull ? `Headshot capacity reached (${avatarCount}/${tierLimit} on ${currentTier} plan)` : 'Upload Image'}
                   >
                     <Upload className="h-3.5 w-3.5" />
-                    <span>Upload Image</span>
+                    <span>{isAvatarFull ? `Limit (${avatarCount}/${tierLimit})` : 'Upload Image'}</span>
                   </button>
                 </div>
                 <input
@@ -851,6 +904,74 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
                   className="hidden"
                 />
               </div>
+
+              {/* Storage Quota Status Pill */}
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/70 border border-slate-800/80 rounded-xl px-3 py-2 text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                    Tier: <strong className="text-white capitalize">{currentTier}</strong> (Max {tierLimit} Per Category)
+                  </span>
+                  <span
+                    className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
+                      isAvatarFull
+                        ? 'text-amber-300 bg-amber-950/60 border-amber-800/60 font-semibold'
+                        : 'text-slate-400 bg-slate-900 border-slate-800'
+                    }`}
+                  >
+                    Headshots: {avatarCount}/{tierLimit}
+                  </span>
+                  <span
+                    className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
+                      isBannerFull
+                        ? 'text-amber-300 bg-amber-950/60 border-amber-800/60 font-semibold'
+                        : 'text-slate-400 bg-slate-900 border-slate-800'
+                    }`}
+                  >
+                    Cover Banners: {bannerCount}/{tierLimit}
+                  </span>
+                </div>
+                {onOpenSubscriptionModal && currentTier !== 'business' && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenSubscriptionModal(
+                        `Image Hub Storage: ${currentTier} plan allows up to ${tierLimit} images (3 for Free, 5 for Basic, 50 for Business). Upgrade to store more.`
+                      )
+                    }
+                    className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 underline"
+                  >
+                    Upgrade Storage →
+                  </button>
+                )}
+              </div>
+
+              {/* Storage Capacity Warning Banner */}
+              {((vaultAssetFilter === 'avatars' && isAvatarFull) ||
+                (vaultAssetFilter === 'banners' && isBannerFull) ||
+                (vaultAssetFilter === 'all' && (isAvatarFull || isBannerFull))) && (
+                <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-amber-500/40 bg-amber-950/30 text-amber-200 text-xs animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                    <span>
+                      <strong>Image Hub Storage Limit:</strong> You have reached the {currentTier} plan limit of{' '}
+                      {tierLimit} {vaultAssetFilter === 'banners' ? 'cover banners' : 'headshots'} (3 on Free, 5 on Basic, 50 on Business). Delete an image or upgrade to store more.
+                    </span>
+                  </div>
+                  {onOpenSubscriptionModal && currentTier !== 'business' && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onOpenSubscriptionModal(
+                          `Image Hub Storage Limit: ${currentTier} plan allows up to ${tierLimit} images. Upgrade to store more.`
+                        )
+                      }
+                      className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs whitespace-nowrap transition shrink-0"
+                    >
+                      Upgrade Plan
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Image Hub Filter Tabs */}
               <div className="flex items-center gap-2 border-b border-slate-800 pb-2 text-xs">
@@ -874,7 +995,7 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
                       : 'text-slate-400 hover:text-slate-200 bg-slate-900/60'
                   }`}
                 >
-                  Headshots ({allHubAssets.filter((p) => p.context !== 'banner' && p.aspectRatio !== '16:9').length})
+                  Headshots ({avatarCount}/{tierLimit})
                 </button>
                 <button
                   type="button"
@@ -885,7 +1006,7 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
                       : 'text-slate-400 hover:text-slate-200 bg-slate-900/60'
                   }`}
                 >
-                  Cover Banners ({allHubAssets.filter((p) => p.context === 'banner' || p.aspectRatio === '16:9').length})
+                  Cover Banners ({bannerCount}/{tierLimit})
                 </button>
               </div>
 
