@@ -165,3 +165,4 @@ export function ensureAllCardsSecurityTraceability(
 ): DigitalCard[] {
   return cards.map((c) => ensureCardSecurityTraceability(c, ownerId, ownerEmail));
 }
+

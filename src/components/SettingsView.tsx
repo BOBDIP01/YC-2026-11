@@ -463,8 +463,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const isKycVerified = Boolean(
     profile.isVerified &&
-      profile.kycVerification?.isCompleted &&
-      profile.kycVerification?.traceabilityId
+    profile.kycVerification?.isCompleted &&
+    profile.kycVerification?.traceabilityId
   );
 
   // Navigation Items
@@ -560,9 +560,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
         {/* Sub-Menu List (Shown on desktop or when top header Settings is clicked; hides automatically once an item is selected) */}
         <div
-          className={`${
-            isSettingsMenuOpen ? 'block' : 'hidden lg:block'
-          } lg:col-span-1 rounded-xl border border-slate-800 bg-slate-900/70 p-2 space-y-1 backdrop-blur-sm lg:sticky lg:top-20`}
+          className={`${isSettingsMenuOpen ? 'block' : 'hidden lg:block'
+            } lg:col-span-1 rounded-xl border border-slate-800 bg-slate-900/70 p-2 space-y-1 backdrop-blur-sm lg:sticky lg:top-20`}
         >
           {menuItems.map((item) => {
             const isActive = activeSubMenu === item.id;
@@ -575,11 +574,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     onToggleSettingsMenu(false);
                   }
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-indigo-600 text-white font-semibold shadow-sm shadow-indigo-500/20'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-xs font-medium transition-all ${isActive
+                  ? 'bg-indigo-600 text-white font-semibold shadow-sm shadow-indigo-500/20'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                  }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className={isActive ? 'text-white' : 'text-slate-400'}>{item.icon}</span>
@@ -619,11 +617,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onChangeAppearanceMode('day')}
-                      className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 transition ${
-                        appearanceMode === 'day'
-                          ? 'bg-amber-500 text-white shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
+                      className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 transition ${appearanceMode === 'day'
+                        ? 'bg-amber-500 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                        }`}
                     >
                       <Sun className="h-3.5 w-3.5" />
                       <span>Day</span>
@@ -631,11 +628,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onChangeAppearanceMode('night')}
-                      className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 transition ${
-                        appearanceMode === 'night'
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
+                      className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 transition ${appearanceMode === 'night'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                        }`}
                     >
                       <Moon className="h-3.5 w-3.5" />
                       <span>Night</span>
@@ -643,11 +639,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onChangeAppearanceMode('auto')}
-                      className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 transition ${
-                        appearanceMode === 'auto'
-                          ? 'bg-cyan-600 text-white shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
+                      className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 transition ${appearanceMode === 'auto'
+                        ? 'bg-cyan-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                        }`}
                     >
                       <Monitor className="h-3.5 w-3.5" />
                       <span>Automatic</span>
@@ -746,11 +741,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           setAccountForm({ ...accountForm, firstName, name: fullName });
                         }}
                         placeholder="e.g. Elena"
-                        className={`w-full rounded-lg bg-slate-950 border px-3 py-2 text-white placeholder-slate-500 focus:outline-none ${
-                          !accountForm.firstName.trim()
-                            ? 'border-rose-500/60 focus:border-rose-400'
-                            : 'border-slate-800 focus:border-indigo-500'
-                        }`}
+                        className={`w-full rounded-lg bg-slate-950 border px-3 py-2 text-white placeholder-slate-500 focus:outline-none ${!accountForm.firstName.trim()
+                          ? 'border-rose-500/60 focus:border-rose-400'
+                          : 'border-slate-800 focus:border-indigo-500'
+                          }`}
                       />
                     </div>
                     <div>
@@ -772,11 +766,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           setAccountForm({ ...accountForm, lastName, name: fullName });
                         }}
                         placeholder="e.g. Rostova"
-                        className={`w-full rounded-lg bg-slate-950 border px-3 py-2 text-white placeholder-slate-500 focus:outline-none ${
-                          !accountForm.lastName.trim()
-                            ? 'border-rose-500/60 focus:border-rose-400'
-                            : 'border-slate-800 focus:border-indigo-500'
-                        }`}
+                        className={`w-full rounded-lg bg-slate-950 border px-3 py-2 text-white placeholder-slate-500 focus:outline-none ${!accountForm.lastName.trim()
+                          ? 'border-rose-500/60 focus:border-rose-400'
+                          : 'border-slate-800 focus:border-indigo-500'
+                          }`}
                       />
                     </div>
                     <div>
@@ -837,11 +830,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         value={accountForm.personalEmail}
                         onChange={(e) => setAccountForm({ ...accountForm, personalEmail: e.target.value })}
                         placeholder="private.email@domain.com"
-                        className={`w-full rounded-lg bg-slate-950 border px-3 py-2 text-white placeholder-slate-500 focus:outline-none ${
-                          !accountForm.personalEmail.trim()
-                            ? 'border-rose-500/60 focus:border-rose-400'
-                            : 'border-slate-800 focus:border-indigo-500'
-                        }`}
+                        className={`w-full rounded-lg bg-slate-950 border px-3 py-2 text-white placeholder-slate-500 focus:outline-none ${!accountForm.personalEmail.trim()
+                          ? 'border-rose-500/60 focus:border-rose-400'
+                          : 'border-slate-800 focus:border-indigo-500'
+                          }`}
                       />
                     </div>
                     <div>
@@ -857,11 +849,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         value={accountForm.personalPhone}
                         onChange={(e) => setAccountForm({ ...accountForm, personalPhone: e.target.value })}
                         placeholder="+1 (555) 000-0000"
-                        className={`w-full rounded-lg bg-slate-950 border px-3 py-2 text-white placeholder-slate-500 focus:outline-none ${
-                          !accountForm.personalPhone.trim()
-                            ? 'border-rose-500/60 focus:border-rose-400'
-                            : 'border-slate-800 focus:border-indigo-500'
-                        }`}
+                        className={`w-full rounded-lg bg-slate-950 border px-3 py-2 text-white placeholder-slate-500 focus:outline-none ${!accountForm.personalPhone.trim()
+                          ? 'border-rose-500/60 focus:border-rose-400'
+                          : 'border-slate-800 focus:border-indigo-500'
+                          }`}
                       />
                     </div>
                     <div>
@@ -987,11 +978,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   {allPersonas.map((p) => (
                     <div
                       key={p.id}
-                      className={`p-3 rounded-lg border flex items-center gap-3 text-xs ${
-                        p.id === profile.id
-                          ? 'border-indigo-500/80 bg-indigo-950/40 text-white'
-                          : 'border-slate-800 bg-slate-950 text-slate-300'
-                      }`}
+                      className={`p-3 rounded-lg border flex items-center gap-3 text-xs ${p.id === profile.id
+                        ? 'border-indigo-500/80 bg-indigo-950/40 text-white'
+                        : 'border-slate-800 bg-slate-950 text-slate-300'
+                        }`}
                     >
                       <img
                         src={p.avatarUrl}
@@ -1177,25 +1167,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 p-1 rounded-lg text-xs font-medium">
                     <button
                       onClick={() => setComplianceSubTab('sovereignty')}
-                      className={`px-3 py-1.5 rounded-md transition ${
-                        complianceSubTab === 'sovereignty' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
-                      }`}
+                      className={`px-3 py-1.5 rounded-md transition ${complianceSubTab === 'sovereignty' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+                        }`}
                     >
                       Data & Privacy
                     </button>
                     <button
                       onClick={() => setComplianceSubTab('privacy')}
-                      className={`px-3 py-1.5 rounded-md transition ${
-                        complianceSubTab === 'privacy' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
-                      }`}
+                      className={`px-3 py-1.5 rounded-md transition ${complianceSubTab === 'privacy' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+                        }`}
                     >
                       Privacy Policy
                     </button>
                     <button
                       onClick={() => setComplianceSubTab('terms')}
-                      className={`px-3 py-1.5 rounded-md transition ${
-                        complianceSubTab === 'terms' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
-                      }`}
+                      className={`px-3 py-1.5 rounded-md transition ${complianceSubTab === 'terms' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+                        }`}
                     >
                       Terms of Use
                     </button>
@@ -1247,11 +1234,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       </div>
                       <button
                         onClick={handleToggleCCPA}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
-                          profile.ccpaDoNotSell
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                        }`}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${profile.ccpaDoNotSell
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                          }`}
                       >
                         <Check className={`h-3.5 w-3.5 ${profile.ccpaDoNotSell ? 'opacity-100' : 'opacity-0'}`} />
                         <span>{profile.ccpaDoNotSell ? 'Opt-Out Active' : 'Opt Out Now'}</span>
@@ -1304,55 +1290,130 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 {complianceSubTab === 'privacy' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                      <h3 className="text-sm font-bold text-white">YouConnect Privacy Policy</h3>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">YouConnect Consolidated Conservative Privacy Policy</h3>
+                        <p className="text-[11px] text-slate-400">GDPR, UK GDPR, Australian Privacy Principles (Privacy Act 1988), Swiss FADP & CCPA/CPRA Compliant</p>
+                      </div>
                       <button
                         onClick={() => handleCopyText('https://youconnect.app/privacy', 'privacy')}
-                        className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                        className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 shrink-0"
                       >
                         {copiedSection === 'privacy' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                         <span>{copiedSection === 'privacy' ? 'Copied' : 'Copy Link'}</span>
                       </button>
                     </div>
-                    <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-3 leading-relaxed max-h-96 overflow-y-auto">
-                      <p>
-                        <strong>1. Privacy & Selective Sharing:</strong> Your profile details, digital cards, and contacts are protected with selective sharing controls. When you share a card link, only the fields you explicitly enable are visible to recipients. We never sell or rent your contact list.
-                      </p>
-                      <p>
-                        <strong>2. Proximity & P2P Radar:</strong> P2P Radar and NFC card sharing operate only while you actively have a session open. No background location tracking is performed.
-                      </p>
-                      <p>
-                        <strong>3. AI Studio & Identity Verification:</strong> Optional AI features (headshots, 3D avatars, banners, bio writing, and identity verification) process your inputs securely to generate your requested content or verify your badge. Uploaded verification photos are never used to train third-party AI models.
-                      </p>
-                      <p>
-                        <strong>4. Contact Us:</strong> For privacy questions or requests, contact <code className="text-indigo-300">privacy@youconnect.app</code>.
-                      </p>
+                    <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-4 leading-relaxed max-h-[460px] overflow-y-auto">
+                      <div>
+                        <h4 className="font-bold text-white mb-1">1. Introduction & Scope of Coverage</h4>
+                        <p className="text-slate-400">
+                          This Privacy Policy applies the strictest data protection standards across the YouConnect platform (<code className="text-indigo-300">com.youconnect.app</code>), web portals, P2P Proximity Radar, AI Studio, Business CRM, and NFC services. Where regional privacy regulations diverge, the most conservative and protective standard applies.
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">2. Categories of Personal & Technical Data Collected</h4>
+                        <ul className="list-disc pl-4 space-y-1 text-slate-400">
+                          <li><strong className="text-slate-200">Account & Registration Data:</strong> Full name, email address, encrypted password hash, unique user ID, and third-party authentication tokens (Firebase Auth: Sign in with Apple, Google Sign-In, Email/Password).</li>
+                          <li><strong className="text-slate-200">Digital Card, Selective Sharing & CRM Data:</strong> Job title, company, phone numbers, emails, physical addresses, emergency contacts, bios, social links, custom Rubrica fields, portraits, banners, portfolio items, and photographs of scanned physical business cards (OCR). Only fields explicitly toggled ON via Selective Sharing are visible on public cards.</li>
+                          <li><strong className="text-slate-200">Cryptographic Card Traceability (No Biometric KYC):</strong> Unique encrypted card security numbers (<code className="text-indigo-300">YC-XXXX-XXXX-XXXX-XXXX</code>), SHA-256 HMAC digests, masked owner email, and issuance timestamps linking published cards to registered accounts in our database for fraud prevention—without collecting government IDs or biometric selfies.</li>
+                          <li><strong className="text-slate-200">AI Studio & Enrichment Inputs:</strong> Prompts, reference portraits/banners, and business contact enrichment queries processed transiently via Google Gemini APIs.</li>
+                          <li><strong className="text-slate-200">P2P Radar, Location & Device Telemetry:</strong> Ephemeral WebSocket room presence, optional GPS/regional coordinates (captured solely while P2P Radar is actively open—never in the background), browser/OS version, IP address (for security rate-limiting), and subscription entitlement receipts.</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">3. Lawful Bases & Strict Restrictions on Data Processing</h4>
+                        <ul className="list-disc pl-4 space-y-1 text-slate-400">
+                          <li><strong className="text-slate-200">Strict Prohibition on Data Sales:</strong> Personal data, Master Profiles, and CRM contact lists are never sold, rented, or traded to third-party data brokers or advertisers.</li>
+                          <li><strong className="text-slate-200">Lawful Grounds:</strong> Contractual necessity (card hosting, selective sharing, cloud backup), explicit user consent (AI generation, camera/OCR scanning, active P2P Radar session), legal obligations, and legitimate security interests.</li>
+                          <li><strong className="text-slate-200">Zero AI Model Training & De-Identified Telemetry:</strong> Uploaded photos, scanned cards, and contacts are never used to train third-party foundational AI models. Operational telemetry is aggregated and de-identified.</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">4. Third-Party Sub-Processors & International Transfers</h4>
+                        <p className="text-slate-400">
+                          Data is shared only with vetted sub-processors under strict DPAs: <strong>Google Cloud / Firebase</strong> (Auth & encrypted Firestore storage), <strong>Google Gemini APIs</strong> (transient AI inference), and <strong>RevenueCat / Apple App Store / Google Play</strong> (PCI-compliant billing). Anyone who receives your public card link (<code className="text-indigo-300">/p/:slug</code>), QR code, or NFC tap can view the fields enabled for that card. Cross-border transfers are safeguarded by the EU-U.S., UK, and Swiss Data Privacy Frameworks and Standard Contractual Clauses (SCCs).
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">5. Security Standards & Data Retention</h4>
+                        <ul className="list-disc pl-4 space-y-1 text-slate-400">
+                          <li><strong className="text-slate-200">Encryption in Transit:</strong> 256-bit TLS 1.3 / HTTPS across all API, Firestore, and P2P WebSocket transmissions.</li>
+                          <li><strong className="text-slate-200">Storage & Payment Isolation:</strong> Encrypted Firestore storage with strict owner-UID access rules; raw payment card details are handled exclusively by Apple/Google PCI-DSS gateways and never stored on YouConnect servers.</li>
+                          <li><strong className="text-slate-200">Retention & Deletion:</strong> Data is retained only for active account duration; suppression flags retain minimal identifiers to permanently honor opt-out requests.</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">6. Comprehensive User & Non-User Rights</h4>
+                        <p className="text-slate-400">
+                          Both registered users and non-users whose contact details were scanned or stored hold enforceable rights to <strong>Access, Correction, and Machine-Readable Portability</strong> (JSON / vCard export), <strong>Immediate Recursive Erasure & Account Deletion</strong> (GDPR Art. 17 & Apple Guideline 5.1.1(v) via in-app purge or <code className="text-indigo-300">/delete-account</code>), and <strong>Consent Withdrawal / CCPA Opt-Out</strong>. Contact: <code className="text-indigo-300">privacy@youconnect.app</code>.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Sub-Tab: Terms of Use */}
+                {/* Sub-Tab: Terms of Use & Legal Disclaimer */}
                 {complianceSubTab === 'terms' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                      <h3 className="text-sm font-bold text-white">Terms of Use</h3>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Consolidated Legal Disclaimer & Terms of Use (EULA)</h3>
+                        <p className="text-[11px] text-slate-400">Maximum Liability Limitation, Strict User Compliance Warranties & Full Indemnification</p>
+                      </div>
                       <button
                         onClick={() => handleCopyText('https://youconnect.app/terms', 'terms')}
-                        className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                        className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 shrink-0"
                       >
                         {copiedSection === 'terms' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                         <span>{copiedSection === 'terms' ? 'Copied' : 'Copy Link'}</span>
                       </button>
                     </div>
-                    <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-3 leading-relaxed max-h-96 overflow-y-auto">
-                      <p>
-                        <strong>1. Subscriptions & AI Coins:</strong> Paid plans (Basic & Business) renew monthly unless cancelled at least 24 hours before the end of the billing period. Daily included AI Quota Coins are non-cumulative and do not roll over to the next month; +50 AI Booster Packs remain valid for 3 months (90 days) from purchase.
-                      </p>
-                      <p>
-                        <strong>2. Trademarks:</strong> Third-party social network names and icons (LinkedIn, X, Instagram, WhatsApp, GitHub, YouTube, etc.) are trademarks of their respective owners and are used solely to link to your designated social profiles.
-                      </p>
-                      <p>
-                        <strong>3. NFC & Sharing:</strong> NFC tag writing and reading depend on compatible device hardware and tag support.
-                      </p>
+                    <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-4 leading-relaxed max-h-[460px] overflow-y-auto">
+                      <div>
+                        <h4 className="font-bold text-white mb-1">1. Binding Acceptance & Age Eligibility</h4>
+                        <p className="text-slate-400">
+                          By downloading, accessing, or using the YouConnect platform, mobile apps, web portals, or physical NFC products, you enter into a binding legal agreement. Users must be at least <strong>18 years of age</strong> (or between 13 and 18 solely under active parental or legal guardian supervision and consent).
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">2. Strict User Warranties & Third-Party Privacy Compliance</h4>
+                        <ul className="list-disc pl-4 space-y-1 text-slate-400">
+                          <li><strong className="text-slate-200">Warranties of Authority & Consent:</strong> You represent and warrant that you are the sole owner of all data you upload, or that you have obtained all legally required notices, consents, licenses, and releases from every individual whose business card, contact details, or likeness you scan (OCR), enrich, store, or upload.</li>
+                          <li><strong className="text-slate-200">Audio, Note-Taking & Media Compliance:</strong> Before using any voice/audio note, camera capture, or AI transcription/enrichment feature, you must comply with all applicable wiretapping, surveillance, and all-party recording consent laws.</li>
+                          <li><strong className="text-slate-200">Respect for Recipient Privacy:</strong> You agree to strictly respect recipient privacy and never use exchanged contact details for unlawful spam, harassment, or unauthorized scraping.</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">3. Account Security, Card Traceability & Prohibited Conduct</h4>
+                        <p className="text-slate-400">
+                          You are solely responsible for maintaining the confidentiality of your account credentials and accept full liability for all actions under your account. Every digital card is assigned a unique cryptographic security number (<code className="text-indigo-300">YC-XXXX-XXXX-XXXX-XXXX</code>) signed with a SHA-256 HMAC digest associating the card with the registered user in our database. Impersonation, uploading unlawful/infringing content, reverse-engineering software/AI models, or bypassing security controls and tier quotas is strictly prohibited.
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">4. Subscriptions, AI Quota Coins & Intellectual Property</h4>
+                        <p className="text-slate-400">
+                          Tiers include <strong>Basic (Free: up to 2 cards, 3 Hub images/category, 0 included daily AI Coins + Booster Pack support)</strong>, <strong>Pro ($12/mo: unlimited cards, 5 Hub images/category, 5 daily AI Coins for any AI utilization)</strong>, and <strong>Business ($29/mo: unlimited cards, 50 Hub images/category, 10 daily AI Image Coins + Unlimited Text/Bio/CRM AI + Full Business CRM)</strong>. Paid plans auto-renew monthly unless canceled at least 24 hours before period end. Daily AI Quota Coins are non-cumulative and do not roll over; +50 AI Booster Packs ($14.99) are valid for 90 days. You retain ownership of your content while granting YouConnect a license to host, process, and display it to operate the service. Third-party social icons remain trademarks of their respective owners.
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">5. Comprehensive Warranty Disclaimers ("AS IS" & "AS AVAILABLE")</h4>
+                        <p className="text-slate-400">
+                          All services, cloud storage, OCR scanning outputs, AI generations, P2P WebSocket Radar, and NFC functionality are provided strictly <strong>"AS IS"</strong> without warranties of any kind. YouConnect disclaims all warranties of merchantability, fitness for a particular purpose, uninterrupted uptime, or error-free OCR/AI accuracy, and bears zero liability for data loss, quota enforcement, or external third-party links.
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">6. Limitation of Liability & Full User Indemnification</h4>
+                        <ul className="list-disc pl-4 space-y-1 text-slate-400">
+                          <li><strong className="text-slate-200">Exclusion of Damages:</strong> In no event shall YouConnect, its operators, affiliates, or sub-processors be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, goodwill, or data.</li>
+                          <li><strong className="text-slate-200">Liability Cap:</strong> Aggregate liability shall not exceed the total subscription fees actually paid by you in the twelve (12) months preceding the claim (or USD $10.00 / the statutory minimum where free Basic services are used).</li>
+                          <li><strong className="text-slate-200">Full User Indemnification:</strong> You agree to defend, indemnify, and hold harmless YouConnect and its personnel from any claims, regulatory fines, damages, and legal fees arising from your breach of these Terms, violation of third-party privacy/publicity/IP rights, or unlawful uploading of third-party contact data.</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">7. Governing Law & Dispute Resolution</h4>
+                        <p className="text-slate-400">
+                          Disputes are governed by the applicable statutory jurisdiction designated by the Operator, subject to mandatory consumer protection laws in your jurisdiction of residence, and resolved on an individual basis (class-action waiver applies). Contact: <code className="text-indigo-300">legal@youconnect.app</code>.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1605,11 +1666,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           return (
                             <div
                               key={tKey}
-                              className={`rounded-xl border p-4 flex flex-col justify-between transition ${
-                                isCurrent
-                                  ? 'border-indigo-500 bg-indigo-950/30 shadow-lg shadow-indigo-500/10'
-                                  : 'border-slate-800 bg-slate-950/70 hover:border-slate-700'
-                              }`}
+                              className={`rounded-xl border p-4 flex flex-col justify-between transition ${isCurrent
+                                ? 'border-indigo-500 bg-indigo-950/30 shadow-lg shadow-indigo-500/10'
+                                : 'border-slate-800 bg-slate-950/70 hover:border-slate-700'
+                                }`}
                             >
                               <div className="space-y-3">
                                 <div className="flex items-center justify-between">
@@ -1635,11 +1695,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                                   }
                                 }}
                                 disabled={isCurrent}
-                                className={`mt-4 w-full py-2 rounded-lg text-xs font-bold transition ${
-                                  isCurrent
-                                    ? 'bg-emerald-950/60 border border-emerald-700/60 text-emerald-300 cursor-default'
-                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                                }`}
+                                className={`mt-4 w-full py-2 rounded-lg text-xs font-bold transition ${isCurrent
+                                  ? 'bg-emerald-950/60 border border-emerald-700/60 text-emerald-300 cursor-default'
+                                  : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                                  }`}
                               >
                                 {isCurrent ? 'Current Active Tier' : `Switch to ${spec.name}`}
                               </button>
@@ -1711,11 +1770,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         <button
                           key={mode.id}
                           onClick={() => setRadarPrefs({ ...radarPrefs, defaultVisibility: mode.id as any })}
-                          className={`p-3 rounded-lg border text-left text-xs transition ${
-                            radarPrefs.defaultVisibility === mode.id
-                              ? 'border-indigo-500 bg-indigo-950/40 text-white font-medium'
-                              : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'
-                          }`}
+                          className={`p-3 rounded-lg border text-left text-xs transition ${radarPrefs.defaultVisibility === mode.id
+                            ? 'border-indigo-500 bg-indigo-950/40 text-white font-medium'
+                            : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'
+                            }`}
                         >
                           <div className="font-semibold">{mode.label}</div>
                           <div className="text-[11px] text-slate-400 mt-0.5">{mode.desc}</div>
@@ -1817,11 +1875,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           biometricLockEnabled: !securitySettings.biometricLockEnabled,
                         })
                       }
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                        securitySettings.biometricLockEnabled
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${securitySettings.biometricLockEnabled
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                        }`}
                     >
                       {securitySettings.biometricLockEnabled ? 'Lock Active' : 'Enable Biometrics'}
                     </button>
@@ -1951,11 +2008,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <button
                       key={pkg.id}
                       onClick={() => setSelectedTopUpPackage(pkg.id as any)}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl border text-left text-xs transition ${
-                        selectedTopUpPackage === pkg.id
-                          ? 'border-indigo-500 bg-indigo-950/50 text-white font-semibold'
-                          : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700'
-                      }`}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl border text-left text-xs transition ${selectedTopUpPackage === pkg.id
+                        ? 'border-indigo-500 bg-indigo-950/50 text-white font-semibold'
+                        : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700'
+                        }`}
                     >
                       <div>
                         <div className="flex items-center gap-2">

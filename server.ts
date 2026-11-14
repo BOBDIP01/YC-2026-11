@@ -2350,35 +2350,83 @@ app.get('/privacy', (_req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Privacy Policy — YouConnect</title>
+  <title>Consolidated Conservative Privacy Policy — YouConnect</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #090D16; color: #E2E8F0; max-width: 780px; margin: 0 auto; padding: 40px 24px; line-height: 1.65; }
-    h1, h2 { color: #FFFFFF; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #090D16; color: #E2E8F0; max-width: 840px; margin: 0 auto; padding: 40px 24px; line-height: 1.65; }
+    h1, h2, h3 { color: #FFFFFF; }
     .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; background: rgba(16,185,129,0.15); color: #34D399; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
     .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; margin: 20px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+    th, td { border: 1px solid rgba(255,255,255,0.12); padding: 12px; text-align: left; vertical-align: top; }
+    th { background: rgba(255,255,255,0.06); color: #FFFFFF; }
     a { color: #60A5FA; }
   </style>
 </head>
 <body>
-  <span class="badge">GDPR &amp; CCPA Compliant • Zero-Knowledge Biometrics</span>
-  <h1>YouConnect Privacy Policy</h1>
-  <p>Last Updated: November 2026 • App ID: <code>com.youconnect.app</code></p>
+  <span class="badge">GDPR • UK GDPR • Australian APPs • Swiss FADP • CCPA/CPRA</span>
+  <h1>YouConnect Consolidated Conservative Privacy Policy</h1>
+  <p>Effective Date: November 14, 2026 • App Bundle ID: <code>com.youconnect.app</code></p>
+
   <div class="card">
-    <h2>1. Data We Collect &amp; Purpose</h2>
-    <p>YouConnect collects only the professional identity details you explicitly add to your digital business cards (Name, Role, Company, Email, Phone, Social links) and authenticated account credentials via Firebase Authentication (Sign in with Apple, Sign in with Google, or Email/Password).</p>
+    <h2>1. Introduction and Scope of Coverage</h2>
+    <p>This Privacy Policy synthesizes the strictest privacy disclosures, selective-sharing boundaries, and user protection obligations across the YouConnect digital business card platform, mobile apps, web portals, P2P Proximity Radar, AI Studio, and Business CRM. Where regional privacy regulations diverge, the most conservative and protective standard applies.</p>
   </div>
+
   <div class="card">
-    <h2>2. Biometric &amp; KYC Zero-Raw-Retention Policy</h2>
-    <p>Optional Identity Verification (KYC) processes government ID imagery and live selfie frames transiently in volatile memory for liveness and face-match verification. Raw document images and biometric selfie frames are purged immediately after verification. Only a non-reversible SHA-256 cryptographic receipt is stored.</p>
+    <h2>2. Categories of Personal and Technical Data Collected</h2>
+    <ul>
+      <li><strong>Account &amp; Registration Data:</strong> Full name, email address, encrypted password hash, unique user ID (<code>uid</code>), and third-party OAuth tokens via Firebase Authentication (Sign in with Apple, Google Sign-In, Email/Password).</li>
+      <li><strong>Digital Business Card, Selective Sharing &amp; CRM Data:</strong> Job title, company, phone numbers, email addresses, physical addresses, emergency contacts, bios, social links, custom Rubrica fields, avatars/portraits, cover banners, portfolio items, and photographs of scanned physical business cards (OCR). Only fields explicitly toggled ON via Selective Sharing are visible on public cards.</li>
+      <li><strong>Cryptographic Card Traceability Metadata (No Biometric KYC):</strong> Unique encrypted card security numbers (<code>YC-XXXX-XXXX-XXXX-XXXX</code>), SHA-256 HMAC digests, masked owner email, and issuance timestamps linking published cards to registered accounts in our database for fraud prevention—without collecting government IDs or biometric selfies.</li>
+      <li><strong>AI Studio &amp; Contact Enrichment Data:</strong> Prompts, reference portraits/banners, and business contact enrichment queries processed transiently via Google Gemini APIs.</li>
+      <li><strong>Proximity (P2P Radar), Location &amp; Telemetry Identifiers:</strong> Ephemeral WebSocket room presence, optional GPS/regional coordinates (captured solely while P2P Radar is actively open—never in the background), browser/OS version, IP address (for security rate-limiting), and subscription entitlement receipts.</li>
+    </ul>
   </div>
+
   <div class="card">
-    <h2>3. Subscriptions &amp; Payments (RevenueCat)</h2>
-    <p>In-app subscriptions (Pro Monthly and Business Monthly) and AI Quota Boosters are processed natively by Apple App Store (StoreKit 2) and Google Play Billing, managed via RevenueCat. YouConnect never stores raw payment card numbers.</p>
+    <h2>3. Lawful Bases and Restrictions on Data Processing</h2>
+    <ul>
+      <li><strong>Strict Prohibition on Data Sales:</strong> Personal data, Master Profiles, and CRM contact lists are never sold, rented, or traded to third-party data brokers or advertisers.</li>
+      <li><strong>Lawful Processing Grounds:</strong> Processing relies exclusively on contractual necessity (card hosting, selective sharing, cloud backup), explicit user consent (AI generation, camera/OCR scanning, active P2P Radar session), legal compliance obligations, and legitimate security interests.</li>
+      <li><strong>Zero AI Model Training &amp; De-Identified Analytics:</strong> Uploaded photos, scanned business cards, and CRM contacts are never used to train third-party foundational AI models. Operational telemetry is aggregated and de-identified.</li>
+    </ul>
   </div>
+
   <div class="card">
-    <h2>4. Account &amp; Data Deletion (GDPR Art. 17 / Apple Guideline 5.1.1(v))</h2>
-    <p>You may permanently delete your account and all associated cloud and local records at any time from within the app (<strong>Settings &rarr; Compliance &rarr; Execute Full Account &amp; Server Purge</strong>) or via our web portal at <a href="/delete-account">/delete-account</a>.</p>
+    <h2>4. Third-Party Sharing and International Transfers</h2>
+    <ul>
+      <li><strong>Authorized Sub-Processors:</strong> Vetted providers bound by strict DPAs: Google Cloud / Firebase (authentication &amp; encrypted Firestore storage), Google Gemini APIs (transient multimodal inference), and RevenueCat / Apple App Store / Google Play (PCI-compliant billing).</li>
+      <li><strong>Public &amp; Semi-Public Card Links:</strong> Anyone who receives or scans your digital card link (<code>/p/:slug</code>), QR code, or NFC tag can view the contact fields you have enabled for that card.</li>
+      <li><strong>Cross-Border Transfers:</strong> Data may be transferred to and processed in the United States, Australia, the EEA, or other jurisdictions where service infrastructure operates, governed by the EU-U.S., UK Extension, and Swiss-U.S. Data Privacy Frameworks and Standard Contractual Clauses (SCCs).</li>
+    </ul>
   </div>
+
+  <div class="card">
+    <h2>5. Security Standards and Data Retention</h2>
+    <table>
+      <thead>
+        <tr><th>Security &amp; Retention Pillar</th><th>Most Conservative Standard Applied</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Encryption in Transit</strong></td><td>All client-to-server, Firestore, and P2P WebSocket transmissions secured via 256-bit Transport Layer Security (TLS 1.3 / HTTPS).</td></tr>
+        <tr><td><strong>Storage &amp; Payment Isolation</strong></td><td>Encrypted cloud storage (Firebase Firestore) with strict owner-UID access controls; payment card details are handled exclusively by PCI-DSS gateways (Apple/Google) and never stored on YouConnect servers.</td></tr>
+        <tr><td><strong>Cryptographic Card Integrity</strong></td><td>Every card is bound to its registered owner via a non-reversible SHA-256 HMAC digest and unique <code>YC-XXXX-XXXX-XXXX-XXXX</code> security number.</td></tr>
+        <tr><td><strong>Retention &amp; Deletion</strong></td><td>Data is retained only for active account duration; inactive accounts may be purged, and suppression lists retain minimal identifiers to honor opt-out requests permanently.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>6. Comprehensive User and Non-User Rights</h2>
+    <ul>
+      <li><strong>Access, Correction, and Portability:</strong> Right to inspect, update, correct inaccurate records, and export personal data in structured, machine-readable JSON and vCard (<code>.vcf</code>) formats.</li>
+      <li><strong>Erasure and Account Deletion (GDPR Art. 17 &amp; Apple Guideline 5.1.1(v)):</strong> Right to permanently delete your account, profiles, digital cards, cryptographic registry records, and contacts at any time in-app (<strong>Settings &rarr; Privacy &amp; Legal &rarr; Delete Account &amp; Data</strong>) or via <a href="/delete-account">/delete-account</a>.</li>
+      <li><strong>Consent Withdrawal &amp; Opt-Out:</strong> Right to toggle selective-sharing fields, revoke camera/location permissions in device settings, and enable the CCPA "Do Not Sell or Share My Personal Information" opt-out.</li>
+      <li><strong>Age Restriction:</strong> Services are strictly restricted to adults aged 18 and older (or minors aged 13–18 solely with verified parental or guardian supervision and consent).</li>
+    </ul>
+    <p>Contact our Privacy Officer at <code>privacy@youconnect.app</code>.</p>
+  </div>
+  <p><a href="/terms">Legal Disclaimer &amp; Terms of Use</a> • <a href="/delete-account">Account Deletion Portal</a></p>
 </body>
 </html>`);
 });
@@ -2390,30 +2438,84 @@ app.get('/terms', (_req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Terms of Use (EULA) — YouConnect</title>
+  <title>Consolidated Legal Disclaimer &amp; Terms of Use (EULA) — YouConnect</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #090D16; color: #E2E8F0; max-width: 780px; margin: 0 auto; padding: 40px 24px; line-height: 1.65; }
-    h1, h2 { color: #FFFFFF; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #090D16; color: #E2E8F0; max-width: 840px; margin: 0 auto; padding: 40px 24px; line-height: 1.65; }
+    h1, h2, h3 { color: #FFFFFF; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; background: rgba(99,102,241,0.18); color: #818CF8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
     .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; margin: 20px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+    th, td { border: 1px solid rgba(255,255,255,0.12); padding: 12px; text-align: left; vertical-align: top; }
+    th { background: rgba(255,255,255,0.06); color: #FFFFFF; }
     a { color: #60A5FA; }
   </style>
 </head>
 <body>
-  <h1>YouConnect Terms of Use &amp; End User License Agreement (EULA)</h1>
-  <p>Effective: November 2026 • Bundle ID: <code>com.youconnect.app</code></p>
+  <span class="badge">Maximum Liability Limitation • Strictest Compliance Warranties • Full Indemnification</span>
+  <h1>YouConnect Consolidated Legal Disclaimer &amp; Terms of Use (EULA)</h1>
+  <p>Effective Date: November 14, 2026 • Bundle ID: <code>com.youconnect.app</code></p>
+
   <div class="card">
-    <h2>1. Auto-Renewable Subscriptions</h2>
-    <p>YouConnect offers optional auto-renewing monthly plans: <strong>Basic Plan ($12/month)</strong> and <strong>Business Pro Plan ($29/month)</strong>, plus an optional consumable <strong>AI Quota Booster ($14.99 for +50 AI Coins, valid 90 days)</strong>.</p>
+    <h2>1. Binding Acceptance and Eligibility</h2>
+    <p>By downloading, accessing, or using the YouConnect digital business card platform, mobile applications, web portals, P2P Proximity Radar, Business CRM, or physical NFC products, you enter into a binding legal agreement. If you do not agree to every term below, you must immediately cease all use of the services. Users must be at least <strong>18 years of age</strong> (or between 13 and 18 solely under active parental or legal guardian supervision and consent).</p>
+  </div>
+
+  <div class="card">
+    <h2>2. Strict User Warranties and Third-Party Privacy Compliance</h2>
     <ul>
-      <li>Payment is charged to your Apple ID or Google Play account at confirmation of purchase.</li>
-      <li>Subscriptions automatically renew unless canceled at least 24 hours before the end of the current monthly billing period.</li>
-      <li>You can manage and cancel subscriptions in your App Store or Google Play Account Settings after purchase.</li>
+      <li><strong>Warranties of Authority and Consent:</strong> You represent and warrant that you are the sole owner of all data you upload, or that you have obtained all legally required notices, consents, licenses, and releases from every individual whose business card, contact details, or likeness you scan (OCR), enrich, store, or upload.</li>
+      <li><strong>All-Party Audio &amp; Media Recording Compliance:</strong> Before using any voice/audio note, camera capture, or AI transcription/enrichment feature, you must comply with all applicable wiretapping, surveillance device, and privacy laws, including obtaining explicit prior consent from all parties where required.</li>
+      <li><strong>Respect for Recipient Privacy:</strong> You undertake to strictly respect the privacy of any individual whose contact information you access or receive through the platform and agree not to use harvested contact details for unlawful spam, harassment, or unauthorized data scraping.</li>
     </ul>
   </div>
+
   <div class="card">
-    <h2>2. Acceptable Use &amp; Digital Identity</h2>
-    <p>You agree not to impersonate others or publish fraudulent identity credentials. Optional KYC verification badges reflect cryptographic verification at the time of inspection.</p>
+    <h2>3. Account Security, Cryptographic Card Traceability &amp; Prohibited Conduct</h2>
+    <ul>
+      <li><strong>Sole Responsibility for Credentials:</strong> You must maintain strict confidentiality over your account credentials and passwords. Sharing accounts is prohibited, and you accept full legal liability for all uploads, shares, and actions occurring under your account.</li>
+      <li><strong>Cryptographic Card Traceability:</strong> Each digital card receives a unique encrypted security number (<code>YC-XXXX-XXXX-XXXX-XXXX</code>) signed with a SHA-256 HMAC digest associating the card with the registered user in our database for audit accountability and anti-impersonation protection.</li>
+      <li><strong>Prohibited Activities:</strong> You must not impersonate others; upload unlawful, defamatory, or infringing content; reverse-engineer software or AI models; bypass security controls or tier quotas; or use the service in any manner that violates intellectual property or data protection laws.</li>
+    </ul>
   </div>
+
+  <div class="card">
+    <h2>4. Subscriptions, AI Quota Coins &amp; Intellectual Property Licenses</h2>
+    <ul>
+      <li><strong>Subscription Tiers &amp; Quotas:</strong> <strong>Basic Tier (Free):</strong> up to 2 cards, 3 Image Hub assets/category, 0 included daily AI Coins (supports +50 AI Booster Packs). <strong>Pro Tier ($12/month):</strong> unlimited cards, 5 Image Hub assets/category, 5 daily AI Coins (for any AI utilization). <strong>Business Tier ($29/month):</strong> unlimited cards, 50 Image Hub assets/category, 10 daily AI Image Coins + Unlimited Text/Bio/CRM AI, plus Full Business CRM &amp; AI Enrichment.</li>
+      <li><strong>Auto-Renewal &amp; Coin Validity:</strong> Paid plans automatically renew monthly unless canceled at least 24 hours before the end of the current billing period. Included daily AI Quota Coins are non-cumulative and do not roll over; optional <strong>+50 AI Booster Packs ($14.99)</strong> are valid for 90 days from purchase.</li>
+      <li><strong>Platform Ownership &amp; Content License:</strong> All software code, UI designs, and trademarks remain the exclusive intellectual property of YouConnect. Third-party social icons are trademarks of their respective owners. While you retain ownership of your business card data, you grant YouConnect a worldwide, non-exclusive, royalty-free license to host, reproduce, process, format, transmit, and display uploaded content as necessary to operate, back up, and improve the service.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>5. Comprehensive Warranty Disclaimers ("As-Is" Provision)</h2>
+    <p>To the maximum extent permitted by applicable law, all applications, cloud services, optical character recognition (OCR) outputs, AI generations/enrichments, P2P WebSocket Radar, and physical NFC products are provided strictly on an <strong>"AS IS"</strong> and <strong>"AS AVAILABLE"</strong> basis without warranties of any kind, whether express, implied, or statutory:</p>
+    <ul>
+      <li><strong>No Guarantee of Accuracy or Uptime:</strong> Operators expressly disclaim all warranties of merchantability, fitness for a particular purpose, non-infringement, uninterrupted availability, or error-free OCR scanning, AI generation, and NFC hardware compatibility.</li>
+      <li><strong>No Liability for Data Loss or Storage Limits:</strong> Operators reserve the right to establish tier storage quotas, impose data retention limits, and terminate inactive accounts. Operators bear zero responsibility or liability for the deletion, corruption, or failure to store any uploaded data or contact records.</li>
+      <li><strong>Third-Party Links and External Platforms:</strong> Operators are not responsible for the availability, content, accuracy, or privacy practices of external websites, CRM integrations, or social networks linked within digital cards.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>6. Limitation of Liability and User Indemnification</h2>
+    <table>
+      <thead>
+        <tr><th>Legal Provision</th><th>Most Conservative Protective Clause</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Exclusion of Damages</strong></td><td>In no event shall YouConnect, its operators, affiliates, officers, or sub-processors be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, business interruption, loss of goodwill, or loss of data, even if advised of the possibility of such damages.</td></tr>
+        <tr><td><strong>Liability Cap</strong></td><td>To the fullest extent permitted by law, aggregate liability arising out of or relating to the use of the services shall not exceed the total subscription fees actually paid by you for the service in the twelve (12) months preceding the claim (or USD $10.00 / the statutory minimum where free Basic services are used).</td></tr>
+        <tr><td><strong>Full User Indemnification</strong></td><td>You agree to defend, indemnify, and hold harmless YouConnect, its operators, and personnel from and against any claims, regulatory fines, damages, liabilities, and legal fees arising out of: (a) your breach of these Terms; (b) your violation of any third party's privacy, publicity, or intellectual property rights; or (c) unauthorized recording, scanning, or unlawful uploading of third-party contact data.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>7. Governing Law and Dispute Resolution</h2>
+    <p>Disputes are governed by the statutory jurisdiction designated by the Operator, subject to mandatory consumer protection laws in your jurisdiction of residence, and resolved on an individual basis (class-action waiver applies). Contact: <code>legal@youconnect.app</code>.</p>
+  </div>
+
   <p><a href="/privacy">Privacy Policy</a> • <a href="/delete-account">Account Deletion Portal</a></p>
 </body>
 </html>`);

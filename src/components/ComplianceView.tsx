@@ -437,8 +437,8 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 space-y-6 text-xs text-slate-300">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div>
-              <h3 className="text-base font-bold text-white">YouConnect Privacy Policy</h3>
-              <p className="text-xs text-slate-400">Effective Date: October 2026 · Complies with Apple Guideline 5.1.1 & GDPR</p>
+              <h3 className="text-base font-bold text-white">YouConnect Consolidated Conservative Privacy Policy</h3>
+              <p className="text-xs text-slate-400">Effective Date: November 2026 · GDPR, UK GDPR, Australian APPs, Swiss FADP & CCPA/CPRA Compliant</p>
             </div>
             <button
               onClick={() => handleCopyText('YouConnect Privacy Policy: https://youconnect.app/privacy', 'privacy-url')}
@@ -453,42 +453,42 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
             <div>
               <h4 className="font-semibold text-white text-sm mb-1">1. Information We Collect & Selective Sharing</h4>
               <p className="text-slate-400">
-                YouConnect processes only the identity fields you enter into your Master Profile. When you publish or share a digital card (/p/:slug), our client- and server-side Selective Sharing filters strip all unshared private fields (such as personal phone, home address, or emergency contacts) before transmission. When you interact with physical NFC tags, the app accesses NFC hardware solely to encode or decode user-specified vCard and URI records.
+                YouConnect processes account registration credentials (via Firebase Authentication) and the identity fields you enter into your Master Profile. When you publish or share a digital card (/p/:slug), our client- and server-side Selective Sharing filters strip all unshared private fields (such as personal phone, home address, or emergency contacts) before transmission. We never sell, rent, or monetize your personal data or contact book.
               </p>
             </div>
 
             <div>
-              <h4 className="font-semibold text-white text-sm mb-1">2. Local-First Storage & Server-Side Traceability</h4>
+              <h4 className="font-semibold text-white text-sm mb-1">2. Cryptographic Card Traceability (No Biometric KYC)</h4>
               <p className="text-slate-400">
-                Your Master Profile, derived cards, and CRM address book are stored locally on your device using client-side sandboxed storage. Sanitized public card snapshots and optional KYC verification cryptographic traceability hashes (with masked document numbers) are stored on the application server solely to resolve public QR/NFC card links and verify your green trust badge. We never sell, rent, or monetize your contact book.
+                Every digital business card receives a unique encrypted security number (YC-XXXX-XXXX-XXXX-XXXX) and a non-reversible SHA-256 HMAC digest associating the card with the registered user account in our database for fraud prevention and audit accountability—without collecting government ID documents or biometric selfies.
               </p>
             </div>
 
             <div>
-              <h4 className="font-semibold text-white text-sm mb-1">3. AI Processing & Biometric KYC Vision</h4>
+              <h4 className="font-semibold text-white text-sm mb-1">3. AI Studio, OCR Scanning & Zero Model Training</h4>
               <p className="text-slate-400">
-                When you explicitly invoke AI features (AI Bio Strategist, AI Studio Headshots, 3D Avatars, Cover Banners, CRM Enrichment, or KYC Document/Selfie Verification), your prompt inputs and uploaded images are transmitted over TLS to our server proxy and processed transiently via Google Gemini APIs. Raw identity documents and biometric selfie photos are never permanently stored on our servers and are never used to train third-party AI models.
+                When you explicitly invoke AI features (AI Bio Strategist, AI Headshots, 3D Avatars, Cover Banners, OCR Card Scanning, or CRM Enrichment), your inputs are transmitted over 256-bit TLS and processed transiently via Google Gemini APIs. Uploaded photos, scanned business cards, and CRM contacts are never used to train third-party foundational AI models.
               </p>
             </div>
 
             <div>
               <h4 className="font-semibold text-white text-sm mb-1">4. Peer-to-Peer Radar & WebSocket Signaling</h4>
               <p className="text-slate-400">
-                Live presence discovery and card exchanges in the P2P Radar Room use ephemeral WebSocket room signaling and browser BroadcastChannels during active user-initiated sessions. No continuous background GPS tracking is performed.
+                Live presence discovery and card exchanges in the P2P Radar Room use ephemeral WebSocket signaling during active user-initiated sessions. No continuous or background GPS tracking is performed.
               </p>
             </div>
 
             <div>
               <h4 className="font-semibold text-white text-sm mb-1">5. Right to Erasure (GDPR Article 17) & Account Deletion</h4>
               <p className="text-slate-400">
-                In strict compliance with Apple App Store Guideline 5.1.1(v), Google Play User Data Policy, and GDPR Article 17, users can immediately and permanently erase all local profiles, cards, CRM contacts, server-published card caches, and KYC traceability records via the "Initiate Right to Erasure" button.
+                In strict compliance with Apple App Store Guideline 5.1.1(v), Google Play User Data Policy, and GDPR Article 17, users can immediately and permanently erase all local profiles, cloud backups, published cards, CRM contacts, and cryptographic registry records via the in-app deletion portal or at /delete-account.
               </p>
             </div>
 
             <div>
               <h4 className="font-semibold text-white text-sm mb-1">6. CCPA "Do Not Sell or Share My Personal Information"</h4>
               <p className="text-slate-400">
-                California residents can toggle the CCPA Opt-Out flag at any time, which enforces Global Privacy Control (GPC) signals and blocks automated scraping or third-party data exchanges.
+                Users can toggle the CCPA Opt-Out flag at any time, which enforces Global Privacy Control (GPC) signals and blocks automated scraping or third-party data exchanges.
               </p>
             </div>
           </div>
@@ -500,37 +500,37 @@ export const ComplianceView: React.FC<ComplianceViewProps> = ({
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 space-y-6 text-xs text-slate-300">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div>
-              <h3 className="text-base font-bold text-white">End User License Agreement (EULA) & Terms</h3>
-              <p className="text-xs text-slate-400">Standard Apple App Store & Google Play Licensed Application End User Agreement</p>
+              <h3 className="text-base font-bold text-white">Consolidated Legal Disclaimer & Terms of Use (EULA)</h3>
+              <p className="text-xs text-slate-400">Maximum Liability Limitation, Strictest User Compliance Warranties & Full Indemnification</p>
             </div>
           </div>
 
           <div className="space-y-4 leading-relaxed max-h-[500px] overflow-y-auto pr-2">
             <div>
-              <h4 className="font-semibold text-white text-sm mb-1">1. Scope of License & Subscriptions</h4>
+              <h4 className="font-semibold text-white text-sm mb-1">1. Binding Acceptance, Eligibility & Subscriptions</h4>
               <p className="text-slate-400">
-                YouConnect grants you a non-transferable, non-exclusive license to use the application on Apple iOS, Google Android, and web-compatible devices. Paid subscriptions (Basic and Business tiers) renew monthly unless cancelled at least 24 hours prior to the renewal date. Included AI Quota Coins are non-cumulative and do not roll over month-to-month; separate +50 AI Booster Packs remain valid for 3 months (90 days) from purchase.
+                Users must be at least 18 years of age (or 13–18 under active parental/guardian supervision and consent). Paid subscriptions (Pro $12/mo and Business $29/mo) renew monthly unless cancelled at least 24 hours prior to renewal. Included daily AI Quota Coins are non-cumulative and do not roll over; +50 AI Booster Packs ($14.99) remain valid for 90 days from purchase.
               </p>
             </div>
 
             <div>
-              <h4 className="font-semibold text-white text-sm mb-1">2. Acceptable Use & Conduct</h4>
+              <h4 className="font-semibold text-white text-sm mb-1">2. Strict User Warranties & Third-Party Privacy Compliance</h4>
               <p className="text-slate-400">
-                Users agree not to broadcast abusive, defamatory, or fraudulent contact information over P2P radar networks or physical NFC tags. Impersonating third-party individuals, corporate officers, or government entities is strictly prohibited.
+                You represent and warrant that you are the sole owner of all data you upload, or have obtained all legally required notices, consents, and releases from every individual whose business card, contact details, or likeness you scan (OCR), enrich, store, or upload, and that you comply with all applicable all-party audio/media recording and privacy laws.
               </p>
             </div>
 
             <div>
-              <h4 className="font-semibold text-white text-sm mb-1">3. Intellectual Property & Nominative Fair Use</h4>
+              <h4 className="font-semibold text-white text-sm mb-1">3. Comprehensive Warranty Disclaimers ("AS IS")</h4>
               <p className="text-slate-400">
-                All YouConnect branding, interface designs, and software code are the intellectual property of YouConnect. You retain 100% ownership of your personal contact data, uploaded portraits, and portfolio works. Third-party social platform names and icons (e.g., LinkedIn, X, Instagram, WhatsApp, GitHub, YouTube) are trademarks of their respective owners and are used strictly under nominative fair use to identify user-provided profile links; YouConnect is not affiliated with or endorsed by those platforms.
+                All services, cloud storage, OCR outputs, AI generations, P2P WebSocket Radar, and NFC hardware interactions are provided strictly "AS IS" and "AS AVAILABLE" without warranties of any kind. YouConnect disclaims all warranties of accuracy, uptime, or fitness for a particular purpose, and bears zero liability for data loss or storage quota enforcement.
               </p>
             </div>
 
             <div>
-              <h4 className="font-semibold text-white text-sm mb-1">4. Disclaimer of Warranties</h4>
+              <h4 className="font-semibold text-white text-sm mb-1">4. Limitation of Liability & Full User Indemnification</h4>
               <p className="text-slate-400">
-                The application is provided "AS IS". NFC hardware interactions depend on device antenna alignment, operating system capabilities (Android Web NFC / iOS CoreNFC & Universal Links), and NDEF tag specifications.
+                In no event shall YouConnect be liable for indirect, incidental, consequential, or punitive damages. Aggregate liability is capped at the total subscription fees paid by you in the preceding 12 months (or USD $10.00 for free Basic users). You agree to defend, indemnify, and hold harmless YouConnect from any claims, regulatory fines, or legal fees arising from your breach of these Terms or unlawful uploading/processing of third-party contact data.
               </p>
             </div>
           </div>
