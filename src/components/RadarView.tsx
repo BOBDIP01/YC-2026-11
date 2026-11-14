@@ -79,9 +79,9 @@ export const RadarView: React.FC<RadarViewProps> = ({
   onUpdateSubscription,
   onOpenSubscriptionModal,
 }) => {
-  const isFreeTier = subscription?.tier === 'free';
+  const isBasicTier = subscription?.tier === 'basic';
   const weeklyRadarLimitReached =
-    isFreeTier && (subscription?.weeklyRadarSessionsUsed || 0) >= 1;
+    isBasicTier && (subscription?.weeklyRadarSessionsUsed || 0) >= 1;
   const [isBroadcastCardDropdownOpen, setIsBroadcastCardDropdownOpen] = useState(false);
 
   const availableCards = cards.length > 0 ? cards : [activeCard];
@@ -895,11 +895,11 @@ export const RadarView: React.FC<RadarViewProps> = ({
     if (!createRoomForm.name.trim()) return;
 
     if (
-      isFreeTier &&
+      isBasicTier &&
       (createRoomForm.maxParticipants === 0 || createRoomForm.maxParticipants > 5)
     ) {
       onOpenSubscriptionModal?.(
-        'Free Tier allows creating P2P Radar rooms for no more than 5 connected persons. Upgrade to Basic ($12/mo) or Business ($29/mo) for unlimited room participants.'
+        'Basic Tier allows creating P2P Radar rooms for no more than 5 connected persons. Upgrade to Pro ($12/mo) or Business ($29/mo) for unlimited room participants.'
       );
       return;
     }
@@ -908,7 +908,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
       setIsCreatingRoom(true);
       setJoinError(null);
 
-      const effectiveMaxParticipants = isFreeTier
+      const effectiveMaxParticipants = isBasicTier
         ? Math.min(5, createRoomForm.maxParticipants || 5)
         : createRoomForm.maxParticipants;
 
@@ -1335,17 +1335,17 @@ export const RadarView: React.FC<RadarViewProps> = ({
                   <div className="max-h-64 overflow-y-auto space-y-1 pt-1">
                     {availableCards.map((c, idx) => {
                       const isActive = c.id === activeCard.id;
-                      const isLockedByFreeTier = isFreeTier && idx >= 2;
+                      const isLockedByBasicTier = isBasicTier && idx >= 2;
                       const matchingPersona = getMatchingPersonaForCard(c);
                       return (
                         <button
                           key={c.id}
                           type="button"
                           onClick={() => {
-                            if (isLockedByFreeTier) {
+                            if (isLockedByBasicTier) {
                               setIsBroadcastCardDropdownOpen(false);
                               onOpenSubscriptionModal?.(
-                                'Free Tier allows up to 2 Digital Business Cards maximum. Upgrade to Basic ($12/mo) or Business ($29/mo) to unlock all cards for P2P broadcasting.'
+                                'Basic Tier allows up to 2 Digital Business Cards maximum. Upgrade to Pro ($12/mo) or Business ($29/mo) to unlock all cards for P2P broadcasting.'
                               );
                               return;
                             }
@@ -1358,7 +1358,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
                           className={`w-full flex items-center justify-between gap-2.5 p-2 rounded-xl text-left text-xs transition ${
                             isActive
                               ? 'bg-indigo-600/90 text-white font-semibold shadow-sm'
-                              : isLockedByFreeTier
+                              : isLockedByBasicTier
                               ? 'text-slate-500 bg-slate-900/40 hover:bg-slate-900'
                               : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                           }`}
@@ -1369,7 +1369,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
                                 src={matchingPersona.avatarUrl || profile.avatarUrl}
                                 alt={c.name}
                                 className={`h-8 w-8 rounded-lg object-cover border border-white/20 ${
-                                  isLockedByFreeTier ? 'opacity-40 grayscale' : ''
+                                  isLockedByBasicTier ? 'opacity-40 grayscale' : ''
                                 }`}
                               />
                               <span
@@ -1380,9 +1380,9 @@ export const RadarView: React.FC<RadarViewProps> = ({
                             <div className="min-w-0">
                               <div className="font-semibold truncate flex items-center gap-1.5">
                                 <span className="truncate">{c.name}</span>
-                                {isLockedByFreeTier && (
+                                {isLockedByBasicTier && (
                                   <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.2 text-[9px] text-amber-300 shrink-0">
-                                    <Lock className="h-2.5 w-2.5" /> Basic+
+                                    <Lock className="h-2.5 w-2.5" /> Pro+
                                   </span>
                                 )}
                               </div>
@@ -1465,7 +1465,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
               onClick={() => {
                 setJoinError(null);
                 if (
-                  isFreeTier &&
+                  isBasicTier &&
                   (createRoomForm.maxParticipants === 0 || createRoomForm.maxParticipants > 5)
                 ) {
                   setCreateRoomForm((prev) => ({ ...prev, maxParticipants: 5 }));
@@ -1633,7 +1633,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
             <div className="flex items-center gap-2">
               <span>
                 Plan ({subscription.tier.toUpperCase()}):{' '}
-                {isFreeTier ? (
+                {isBasicTier ? (
                   <strong className="text-amber-300 font-mono">
                     {subscription.weeklyRadarSessionsUsed || 0}/1 weekly session · 5 max/room
                   </strong>
@@ -1641,7 +1641,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
                   <strong className="text-emerald-300">Unlimited Radar & Capacity</strong>
                 )}
               </span>
-              {isFreeTier && !weeklyRadarLimitReached && onUpdateSubscription && (
+              {isBasicTier && !weeklyRadarLimitReached && onUpdateSubscription && (
                 <button
                   type="button"
                   onClick={() =>
@@ -1655,12 +1655,12 @@ export const RadarView: React.FC<RadarViewProps> = ({
                   Simulate Limit
                 </button>
               )}
-              {isFreeTier && (
+              {isBasicTier && (
                 <button
                   type="button"
                   onClick={() =>
                     onOpenSubscriptionModal?.(
-                      'Upgrade to Basic ($12/mo) or Business ($29/mo) for Unlimited P2P Radar sessions and Unlimited room participants.'
+                      'Upgrade to Pro ($12/mo) or Business ($29/mo) for Unlimited P2P Radar sessions and Unlimited room participants.'
                     )
                   }
                   className="rounded bg-cyan-600 hover:bg-cyan-500 px-2.5 py-0.5 text-[10px] font-bold text-white transition"
@@ -1673,7 +1673,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
         </div>
       </div>
 
-      {/* Weekly Free Tier Radar Session Exhausted Gate */}
+      {/* Weekly Basic Tier Radar Session Exhausted Gate */}
       {weeklyRadarLimitReached && (
         <div className="rounded-2xl border border-amber-500/40 bg-slate-900/95 p-6 text-center space-y-4 shadow-2xl">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400">
@@ -1681,10 +1681,10 @@ export const RadarView: React.FC<RadarViewProps> = ({
           </div>
           <div className="space-y-1 max-w-lg mx-auto">
             <h3 className="text-base font-bold text-white">
-              Weekly Free P2P Radar Session Limit Reached (1 / 1 Used This Week)
+              Weekly Basic P2P Radar Session Limit Reached (1 / 1 Used This Week)
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              The <strong>Free Tier</strong> includes <strong>1 P2P Radar session per week</strong> and room creation for up to <strong>5 connected persons</strong>. Upgrade to <strong>Basic ($12/mo)</strong> or <strong>Business ($29/mo)</strong> for unlimited P2P Radar sessions and unlimited room participants.
+              The <strong>Basic Tier</strong> includes <strong>1 P2P Radar session per week</strong> and room creation for up to <strong>5 connected persons</strong>. Upgrade to <strong>Pro ($12/mo)</strong> or <strong>Business ($29/mo)</strong> for unlimited P2P Radar sessions and unlimited room participants.
             </p>
           </div>
           <div className="flex items-center justify-center gap-3 flex-wrap">
@@ -1692,12 +1692,12 @@ export const RadarView: React.FC<RadarViewProps> = ({
               type="button"
               onClick={() =>
                 onOpenSubscriptionModal?.(
-                  'Free Tier includes 1 P2P Radar session per week. Upgrade to Basic or Business for Unlimited P2P Radar discovery and Unlimited room participants.'
+                  'Basic Tier includes 1 P2P Radar session per week. Upgrade to Pro or Business for Unlimited P2P Radar discovery and Unlimited room participants.'
                 )
               }
               className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-95 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
             >
-              Upgrade to Basic or Business
+              Upgrade to Pro or Business
             </button>
             {onUpdateSubscription && subscription && (
               <button
@@ -1987,9 +1987,9 @@ export const RadarView: React.FC<RadarViewProps> = ({
                       const chosenIdx = availableCards.findIndex((c) => c.id === e.target.value);
                       const chosen = availableCards[chosenIdx];
                       if (!chosen) return;
-                      if (isFreeTier && chosenIdx >= 2) {
+                      if (isBasicTier && chosenIdx >= 2) {
                         onOpenSubscriptionModal?.(
-                          'Free Tier allows up to 2 Digital Business Cards maximum. Upgrade to Basic ($12/mo) or Business ($29/mo) to unlock all cards.'
+                          'Basic Tier allows up to 2 Digital Business Cards maximum. Upgrade to Pro ($12/mo) or Business ($29/mo) to unlock all cards.'
                         );
                         return;
                       }
@@ -2002,12 +2002,12 @@ export const RadarView: React.FC<RadarViewProps> = ({
                     className="w-full rounded-lg border border-indigo-500/40 bg-slate-950 px-2.5 py-1.5 text-xs font-medium text-white focus:border-cyan-400 focus:outline-none"
                   >
                     {availableCards.map((c, idx) => {
-                      const locked = isFreeTier && idx >= 2;
+                      const locked = isBasicTier && idx >= 2;
                       const matchingPersona = getMatchingPersonaForCard(c);
                       return (
                         <option key={c.id} value={c.id}>
                           {c.name} — {matchingPersona.role || c.tag || 'Card'}
-                          {locked ? ' (Basic+ Locked)' : ''}
+                          {locked ? ' (Pro+ Locked)' : ''}
                         </option>
                       );
                     })}
@@ -2335,9 +2335,9 @@ export const RadarView: React.FC<RadarViewProps> = ({
                     const chosenIdx = availableCards.findIndex((c) => c.id === e.target.value);
                     const chosen = availableCards[chosenIdx];
                     if (!chosen) return;
-                    if (isFreeTier && chosenIdx >= 2) {
+                    if (isBasicTier && chosenIdx >= 2) {
                       onOpenSubscriptionModal?.(
-                        'Free Tier allows up to 2 Digital Business Cards maximum. Upgrade to Basic ($12/mo) or Business ($29/mo) to unlock all cards.'
+                        'Basic Tier allows up to 2 Digital Business Cards maximum. Upgrade to Pro ($12/mo) or Business ($29/mo) to unlock all cards.'
                       );
                       return;
                     }
@@ -2350,12 +2350,12 @@ export const RadarView: React.FC<RadarViewProps> = ({
                   className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-medium text-white focus:border-cyan-400 focus:outline-none"
                 >
                   {availableCards.map((c, idx) => {
-                    const locked = isFreeTier && idx >= 2;
+                    const locked = isBasicTier && idx >= 2;
                     const matchingPersona = getMatchingPersonaForCard(c);
                     return (
                       <option key={c.id} value={c.id}>
                         {c.name} ({matchingPersona.role || c.tag || 'Card'})
-                        {locked ? ' — Basic+ Locked' : ''}
+                        {locked ? ' — Pro+ Locked' : ''}
                       </option>
                     );
                   })}
@@ -2667,8 +2667,8 @@ export const RadarView: React.FC<RadarViewProps> = ({
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400">
-                  {isFreeTier
-                    ? 'Free Tier allows creating rooms for no more than 5 persons connected. Upgrade to Basic or Business for unlimited room participants.'
+                  {isBasicTier
+                    ? 'Basic Tier allows creating rooms for no more than 5 persons connected. Upgrade to Pro or Business for unlimited room participants.'
                     : 'Caps the number of people that can be discovered and interact inside the room.'}
                 </p>
 
@@ -2682,7 +2682,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
                     { value: 0, label: 'Unlimited' },
                   ].map((opt) => {
                     const isLockedOption =
-                      isFreeTier && (opt.value === 0 || opt.value > 5);
+                      isBasicTier && (opt.value === 0 || opt.value > 5);
                     return (
                       <button
                         key={opt.value}
@@ -2690,7 +2690,7 @@ export const RadarView: React.FC<RadarViewProps> = ({
                         onClick={() => {
                           if (isLockedOption) {
                             onOpenSubscriptionModal?.(
-                              'Free Tier allows creating rooms for up to 5 connected persons maximum. Upgrade to Basic ($12/mo) or Business ($29/mo) for unlimited room participants.'
+                              'Basic Tier allows creating rooms for up to 5 connected persons maximum. Upgrade to Pro ($12/mo) or Business ($29/mo) for unlimited room participants.'
                             );
                             return;
                           }

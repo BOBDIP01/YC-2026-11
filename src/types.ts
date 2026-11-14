@@ -749,7 +749,7 @@ export interface RadarRoomPublicInfo {
   isDefault?: boolean;
 }
 
-export type SubscriptionTier = 'free' | 'basic' | 'business';
+export type SubscriptionTier = 'basic' | 'pro' | 'business';
 
 export type AiUsageType =
   | 'image_headshot'
@@ -791,7 +791,7 @@ export interface SubscriptionState {
   boosterExpiresAt?: string; // ISO date of active booster pack expiration (3 months validity)
   // Total lifetime coins consumed counter
   totalCoinsConsumedLifetime: number;
-  // P2P Radar weekly usage tracking (Free tier: max 1 session/week)
+  // P2P Radar weekly usage tracking (Basic tier: max 1 session/week)
   radarWeekStartDate: string; // YYYY-MM-DD of current week
   weeklyRadarSessionsUsed: number;
   activeRadarSessionDate?: string; // Allows re-entering radar on the same active session day without double-counting

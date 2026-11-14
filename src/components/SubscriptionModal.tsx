@@ -255,9 +255,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   <div className="text-[10px] text-slate-400 mt-0.5">
                     {summary.tier === 'business'
                       ? 'Non-cumulative · No rollover'
-                      : summary.tier === 'basic'
+                      : summary.tier === 'pro'
                       ? 'Non-cumulative · No rollover'
-                      : '0 Included on Free'}
+                      : '0 Included on Basic'}
                   </div>
                 </div>
 
@@ -302,9 +302,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   <span className="text-slate-300 font-medium">
                     {summary.tier === 'business'
                       ? `Daily AI Image Generation Quota (${summary.dailyUsed} of ${summary.dailyIncludedMax} used today)`
-                      : summary.tier === 'basic'
+                      : summary.tier === 'pro'
                       ? `Daily Included AI Quota (${summary.dailyUsed} of ${summary.dailyIncludedMax} coins used today)`
-                      : 'Free Tier Daily Included AI Quota (0 included — uses AI Booster Pack coins)'}
+                      : 'Basic Tier Daily Included AI Quota (0 included — uses AI Booster Pack coins)'}
                   </span>
                   <span className="font-mono text-slate-400">{dailyProgressPercent}% used</span>
                 </div>
@@ -412,12 +412,12 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               <span className="text-xs text-slate-400">
                 Active Digital Cards in Studio:{' '}
                 <strong className="text-white font-mono">{effectiveCardCount}</strong>
-                {summary.tier === 'free' ? ' / 2 Max on Free Tier' : ' (Unlimited)'}
+                {summary.tier === 'basic' ? ' / 2 Max on Basic Tier' : ' (Unlimited)'}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {(['free', 'basic', 'business'] as SubscriptionTier[]).map((tierKey) => {
+              {(['basic', 'pro', 'business'] as SubscriptionTier[]).map((tierKey) => {
                 const spec = SUBSCRIPTION_TIER_SPECS[tierKey];
                 const isCurrent = subscription.tier === tierKey;
 
@@ -437,7 +437,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                             className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                               tierKey === 'business'
                                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                : tierKey === 'basic'
+                                : tierKey === 'pro'
                                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                                 : 'bg-slate-800 text-slate-300 border border-slate-700'
                             }`}
@@ -473,9 +473,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">Daily AI Quota:</span>
                           <span className="font-bold text-amber-300">
-                            {tierKey === 'free'
+                            {tierKey === 'basic'
                               ? '0 Included (Booster Only)'
-                              : tierKey === 'basic'
+                              : tierKey === 'pro'
                               ? '5 Coins / Day'
                               : '10 Image Coins / Day'}
                           </span>
@@ -485,7 +485,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                           <span className="font-bold text-cyan-300">
                             {tierKey === 'business'
                               ? 'Unlimited (Included)'
-                              : tierKey === 'basic'
+                              : tierKey === 'pro'
                               ? 'Uses Quota Coin'
                               : 'Booster Coin Only'}
                           </span>
@@ -493,7 +493,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">P2P Radar:</span>
                           <span className="font-bold text-white">
-                            {tierKey === 'free'
+                            {tierKey === 'basic'
                               ? '1/wk · Max 5/room'
                               : 'Unlimited Rooms & Peers'}
                           </span>
@@ -536,7 +536,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                             ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 cursor-default'
                             : tierKey === 'business'
                             ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20'
-                            : tierKey === 'basic'
+                            : tierKey === 'pro'
                             ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/20'
                             : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
                         }`}
@@ -545,8 +545,8 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                           ? 'Processing...'
                           : isCurrent
                           ? `✓ Current Active Plan (${spec.name})`
-                          : tierKey === 'free'
-                          ? 'Switch to Free Tier ($0)'
+                          : tierKey === 'basic'
+                          ? 'Switch to Basic Tier ($0)'
                           : `Subscribe to ${spec.name} (${spec.priceLabel}/mo)`}
                       </button>
                     </div>

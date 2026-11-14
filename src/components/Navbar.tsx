@@ -68,8 +68,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       shortLabel: 'Radar',
       icon: <Radio className="h-4 w-4 md:h-3.5 md:w-3.5 text-cyan-400" />,
       title:
-        summary.tier === 'free'
-          ? 'P2P Radar (Free tier: 1 session/week, max 5 participants per room)'
+        summary.tier === 'basic'
+          ? 'P2P Radar (Basic tier: 1 session/week, max 5 participants per room)'
           : 'Discover and exchange cards with nearby peers (Unlimited)',
     },
     {
@@ -189,7 +189,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className={`hidden xs:inline-block rounded px-1.5 py-0.5 text-[9px] font-mono font-extrabold uppercase tracking-wider ${
                   summary.tier === 'business'
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    : summary.tier === 'basic'
+                    : summary.tier === 'pro'
                     ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                     : 'bg-slate-800 text-slate-300 border border-slate-700'
                 }`}

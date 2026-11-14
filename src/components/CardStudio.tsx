@@ -132,7 +132,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   onConsumeAiCoin,
   onOpenSubscriptionModal,
 }) => {
-  const currentTier = subscription?.tier || 'free';
+  const currentTier = subscription?.tier || 'basic';
   const tierImageLimit = getImageHubLimit(currentTier);
   const avatarHubCount = countHubImages(profile, 'avatar');
   const bannerHubCount = countHubImages(profile, 'banner');
@@ -1300,18 +1300,18 @@ export const CardStudio: React.FC<CardStudioProps> = ({
               <div className="absolute left-0 right-0 top-full mt-2 rounded-xl border border-slate-700 bg-slate-950 shadow-2xl p-1.5 z-50 max-h-72 overflow-y-auto space-y-1">
                 {cards.map((c, idx) => {
                   const isActive = c.id === activeCard.id;
-                  const isLockedByFreeTier = subscription?.tier === 'free' && idx >= 2;
+                  const isLockedByBasicTier = subscription?.tier === 'basic' && idx >= 2;
                   const cardPortrait = c.avatarUrl || profile.avatarUrl;
                   return (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => {
-                        if (isLockedByFreeTier) {
+                        if (isLockedByBasicTier) {
                           setIsCardSelectorOpen(false);
                           if (onOpenSubscriptionModal) {
                             onOpenSubscriptionModal(
-                              'Free Tier allows up to 2 Digital Business Cards maximum. Upgrade to Basic ($12/mo) or Business ($29/mo) to unlock unlimited digital cards.'
+                              'Basic Tier allows up to 2 Digital Business Cards maximum. Upgrade to Pro ($12/mo) or Business ($29/mo) to unlock unlimited digital cards.'
                             );
                           }
                           return;
@@ -1322,7 +1322,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                       className={`w-full flex items-center justify-between gap-2.5 p-2 rounded-lg text-xs transition ${
                         isActive
                           ? 'bg-indigo-600 text-white font-semibold shadow-sm'
-                          : isLockedByFreeTier
+                          : isLockedByBasicTier
                           ? 'text-slate-500 bg-slate-900/40 hover:bg-slate-900'
                           : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                       }`}
@@ -1333,13 +1333,13 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                             src={cardPortrait}
                             alt={c.name}
                             className={`h-7 w-7 rounded-full object-cover border border-white/20 shrink-0 ${
-                              isLockedByFreeTier ? 'opacity-40 grayscale' : ''
+                              isLockedByBasicTier ? 'opacity-40 grayscale' : ''
                             }`}
                           />
                         ) : (
                           <div
                             className={`h-7 w-7 rounded-full bg-indigo-950 border border-white/20 shrink-0 flex items-center justify-center text-[10px] font-bold text-indigo-200 uppercase ${
-                              isLockedByFreeTier ? 'opacity-40 grayscale' : ''
+                              isLockedByBasicTier ? 'opacity-40 grayscale' : ''
                             }`}
                           >
                             {(c.name || 'YC')
@@ -1358,9 +1358,9 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                                 Custom Photo
                               </span>
                             )}
-                            {isLockedByFreeTier && (
+                            {isLockedByBasicTier && (
                               <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.2 text-[9px] text-amber-300">
-                                <Lock className="h-2.5 w-2.5" /> Basic+
+                                <Lock className="h-2.5 w-2.5" /> Pro+
                               </span>
                             )}
                           </div>
@@ -1459,9 +1459,9 @@ export const CardStudio: React.FC<CardStudioProps> = ({
             <button
               type="button"
               onClick={() => {
-                if (subscription?.tier === 'free' && cards.length >= 2) {
+                if (subscription?.tier === 'basic' && cards.length >= 2) {
                   onOpenSubscriptionModal?.(
-                    'Free Tier allows generating a maximum of 2 Digital Business Cards. Upgrade to Basic or Business for unlimited cards, or delete an existing card first.'
+                    'Basic Tier allows generating a maximum of 2 Digital Business Cards. Upgrade to Pro or Business for unlimited cards, or delete an existing card first.'
                   );
                   return;
                 }
@@ -1494,9 +1494,9 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           <button
             type="button"
             onClick={() => {
-              if (subscription?.tier === 'free' && cards.length >= 2) {
+              if (subscription?.tier === 'basic' && cards.length >= 2) {
                 onOpenSubscriptionModal?.(
-                  'Free Tier allows generating a maximum of 2 Digital Business Cards. Upgrade to Basic ($12/mo) or Business ($29/mo) for unlimited cards, or delete an existing card first.'
+                  'Basic Tier allows generating a maximum of 2 Digital Business Cards. Upgrade to Pro ($12/mo) or Business ($29/mo) for unlimited cards, or delete an existing card first.'
                 );
                 return;
               }

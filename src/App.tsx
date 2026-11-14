@@ -578,17 +578,33 @@ export default function App() {
     return INITIAL_CRM_CONTACTS;
   });
 
-  // Subscription & AI Quota Coin State (Free / Basic / Business + 50-Coin AI Booster Pack)
+  // Subscription & AI Quota Coin State (Basic / Pro / Business + 50-Coin AI Booster Pack)
   const [subscription, setSubscription] = useState<SubscriptionState>(() => {
-    const saved = localStorage.getItem('youconnect_subscription_v1');
-    if (saved) {
+    const savedV2 = localStorage.getItem('youconnect_subscription_v2');
+    if (savedV2) {
       try {
-        return normalizeSubscriptionState(JSON.parse(saved));
+        return normalizeSubscriptionState(JSON.parse(savedV2));
+      } catch {}
+    }
+    const savedV1 = localStorage.getItem('youconnect_subscription_v1');
+    if (savedV1) {
+      try {
+        const parsed = JSON.parse(savedV1);
+        let migratedTier: SubscriptionTier = 'basic';
+        if (parsed?.tier === 'business') migratedTier = 'business';
+        else if (parsed?.tier === 'basic') migratedTier = 'pro';
+        else migratedTier = 'basic';
+        const migrated = normalizeSubscriptionState({
+          ...parsed,
+          tier: migratedTier,
+        });
+        localStorage.setItem('youconnect_subscription_v2', JSON.stringify(migrated));
+        return migrated;
       } catch {
-        return getInitialSubscriptionState('free');
+        return getInitialSubscriptionState('basic');
       }
     }
-    return getInitialSubscriptionState('free');
+    return getInitialSubscriptionState('basic');
   });
 
   const subscriptionRef = React.useRef<SubscriptionState>(subscription);
@@ -701,6 +717,7 @@ export default function App() {
   }, [contacts]);
 
   useEffect(() => {
+    safeSetLocalStorage('youconnect_subscription_v2', JSON.stringify(subscription));
     safeSetLocalStorage('youconnect_subscription_v1', JSON.stringify(subscription));
   }, [subscription]);
 
@@ -726,6 +743,7 @@ export default function App() {
       return false;
     }
     subscriptionRef.current = result.updated;
+    safeSetLocalStorage('youconnect_subscription_v2', JSON.stringify(result.updated));
     safeSetLocalStorage('youconnect_subscription_v1', JSON.stringify(result.updated));
     setSubscription(result.updated);
     return true;
@@ -738,6 +756,7 @@ export default function App() {
         tier: newTier,
       });
       subscriptionRef.current = next;
+      safeSetLocalStorage('youconnect_subscription_v2', JSON.stringify(next));
       safeSetLocalStorage('youconnect_subscription_v1', JSON.stringify(next));
       return next;
     });
@@ -747,6 +766,7 @@ export default function App() {
     setSubscription((prev) => {
       const next = purchaseAiBoosterPack(prev, coinsToAdd);
       subscriptionRef.current = next;
+      safeSetLocalStorage('youconnect_subscription_v2', JSON.stringify(next));
       safeSetLocalStorage('youconnect_subscription_v1', JSON.stringify(next));
       return next;
     });

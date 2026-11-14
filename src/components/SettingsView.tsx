@@ -1504,7 +1504,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
                       {/* 3-Tier Selector Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {(['free', 'basic', 'business'] as SubscriptionTier[]).map((tKey) => {
+                        {(['basic', 'pro', 'business'] as SubscriptionTier[]).map((tKey) => {
                           const spec = SUBSCRIPTION_TIER_SPECS[tKey];
                           const isCurrent = subscription.tier === tKey;
                           return (
@@ -1533,8 +1533,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                               </div>
                               <button
                                 onClick={() => {
-                                  if (tKey === 'free') {
-                                    onChangeTier?.('free');
+                                  if (tKey === 'basic') {
+                                    onChangeTier?.('basic');
                                   } else {
                                     onOpenSubscriptionModal?.();
                                   }

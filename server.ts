@@ -1807,7 +1807,7 @@ app.post('/api/cards/reciprocal', (req, res) => {
 
 interface UserEntitlementState {
   appUserId: string;
-  tier: 'FREE' | 'BASIC' | 'BUSINESS';
+  tier: 'BASIC' | 'PRO' | 'BUSINESS';
   activeEntitlements: string[];
   activeSubscriptions: string[];
   boosterBalance: number;
@@ -1898,7 +1898,7 @@ function getOrCreateEntitlement(appUserId: string): UserEntitlementState {
   if (existing) return existing;
   const initial: UserEntitlementState = {
     appUserId,
-    tier: 'FREE',
+    tier: 'BASIC',
     activeEntitlements: [],
     activeSubscriptions: [],
     boosterBalance: 0,
@@ -2102,15 +2102,17 @@ app.post('/api/webhooks/revenuecat', (req, res) => {
         productId.includes('business')
       ) {
         state.tier = 'BUSINESS';
-        state.activeEntitlements = Array.from(new Set([...state.activeEntitlements, 'business_access', 'basic_access']));
+        state.activeEntitlements = Array.from(new Set([...state.activeEntitlements, 'business_access', 'pro_access']));
         state.activeSubscriptions = Array.from(new Set([...state.activeSubscriptions, productId || 'youconnect_business_monthly']));
       } else if (
+        entitlementIds.includes('pro_access') ||
         entitlementIds.includes('basic_access') ||
+        productId.includes('pro') ||
         productId.includes('basic')
       ) {
-        if (state.tier !== 'BUSINESS') state.tier = 'BASIC';
-        state.activeEntitlements = Array.from(new Set([...state.activeEntitlements, 'basic_access']));
-        state.activeSubscriptions = Array.from(new Set([...state.activeSubscriptions, productId || 'youconnect_basic_monthly']));
+        if (state.tier !== 'BUSINESS') state.tier = 'PRO';
+        state.activeEntitlements = Array.from(new Set([...state.activeEntitlements, 'pro_access']));
+        state.activeSubscriptions = Array.from(new Set([...state.activeSubscriptions, productId || 'youconnect_pro_monthly']));
       }
       if (event.expiration_at_ms) {
         state.expirationDate = new Date(Number(event.expiration_at_ms)).toISOString();
@@ -2123,7 +2125,7 @@ app.post('/api/webhooks/revenuecat', (req, res) => {
         state.boosterExpiresAt = exp.toISOString();
       }
     } else if (eventType === 'EXPIRATION' || eventType === 'BILLING_ISSUE') {
-      state.tier = 'FREE';
+      state.tier = 'BASIC';
       state.activeEntitlements = [];
       state.activeSubscriptions = [];
     }
@@ -2186,14 +2188,14 @@ app.post('/api/billing/verify-receipt', (req, res) => {
       state.boosterExpiresAt = exp.toISOString();
     } else if (normalizedTier === 'BUSINESS' || String(productId).includes('business')) {
       state.tier = 'BUSINESS';
-      state.activeEntitlements = ['business_access', 'basic_access'];
+      state.activeEntitlements = ['business_access', 'pro_access'];
       state.activeSubscriptions = [productId || 'youconnect_business_monthly'];
-    } else if (normalizedTier === 'BASIC' || String(productId).includes('basic')) {
+    } else if (normalizedTier === 'PRO' || String(productId).includes('pro') || (normalizedTier === 'BASIC' && String(productId).includes('basic'))) {
+      state.tier = 'PRO';
+      state.activeEntitlements = ['pro_access'];
+      state.activeSubscriptions = [productId || 'youconnect_pro_monthly'];
+    } else {
       state.tier = 'BASIC';
-      state.activeEntitlements = ['basic_access'];
-      state.activeSubscriptions = [productId || 'youconnect_basic_monthly'];
-    } else if (normalizedTier === 'FREE') {
-      state.tier = 'FREE';
       state.activeEntitlements = [];
       state.activeSubscriptions = [];
     }
@@ -2319,7 +2321,7 @@ app.get('/privacy', (_req, res) => {
   </div>
   <div class="card">
     <h2>3. Subscriptions &amp; Payments (RevenueCat)</h2>
-    <p>In-app subscriptions (Basic Monthly and Business Pro Monthly) and AI Quota Boosters are processed natively by Apple App Store (StoreKit 2) and Google Play Billing, managed via RevenueCat. YouConnect never stores raw payment card numbers.</p>
+    <p>In-app subscriptions (Pro Monthly and Business Monthly) and AI Quota Boosters are processed natively by Apple App Store (StoreKit 2) and Google Play Billing, managed via RevenueCat. YouConnect never stores raw payment card numbers.</p>
   </div>
   <div class="card">
     <h2>4. Account &amp; Data Deletion (GDPR Art. 17 / Apple Guideline 5.1.1(v))</h2>

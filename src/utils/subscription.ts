@@ -35,9 +35,9 @@ export const AI_BOOSTER_VALIDITY_MONTHS = 3;
 export const AI_BOOSTER_VALIDITY_DAYS = 90;
 
 export const SUBSCRIPTION_TIER_SPECS: Record<SubscriptionTier, TierSpec> = {
-  free: {
-    id: 'free',
-    name: 'Free',
+  basic: {
+    id: 'basic',
+    name: 'Basic',
     badge: 'Starter',
     priceLabel: '$0',
     billingPeriod: 'Free Forever',
@@ -65,9 +65,9 @@ export const SUBSCRIPTION_TIER_SPECS: Record<SubscriptionTier, TierSpec> = {
       'No access to Business CRM',
     ],
   },
-  basic: {
-    id: 'basic',
-    name: 'Basic',
+  pro: {
+    id: 'pro',
+    name: 'Pro',
     badge: 'Most Popular',
     priceLabel: '$12',
     billingPeriod: '/ month',
@@ -86,7 +86,7 @@ export const SUBSCRIPTION_TIER_SPECS: Record<SubscriptionTier, TierSpec> = {
     maxImageHubPictures: 5,
     maxImageHubPicturesLabel: '5 Stored Images Max (Profile / Background)',
     features: [
-      'All Free tier features + Unlimited Digital Cards',
+      'All Basic tier features + Unlimited Digital Cards',
       'Image Hub: Store up to 5 profile photos & 5 background covers',
       '5 AI Quota Coins / day included (for any AI utilization)',
       'Non-cumulative quota: remaining monthly coins do NOT roll over to next month',
@@ -116,7 +116,7 @@ export const SUBSCRIPTION_TIER_SPECS: Record<SubscriptionTier, TierSpec> = {
     maxImageHubPictures: 50,
     maxImageHubPicturesLabel: '50 Stored Images Max (Profile / Background)',
     features: [
-      'Everything in Basic + Full Business CRM & After-Sales Hub',
+      'Everything in Pro + Full Business CRM & After-Sales Hub',
       'Image Hub: Store up to 50 profile photos & 50 background covers',
       '10 AI Image Generations / day included (non-cumulative · no monthly rollover)',
       'Full AI Power for CRM Support, Social Scanning, Reasoning & Text Writing (Unlimited up to Google service limits)',
@@ -165,7 +165,7 @@ export function getCurrentWeekMondayStr(): string {
 }
 
 export function getInitialSubscriptionState(
-  initialTier: SubscriptionTier = 'free'
+  initialTier: SubscriptionTier = 'basic'
 ): SubscriptionState {
   const today = getTodayDateStr();
   const monday = getCurrentWeekMondayStr();
@@ -188,14 +188,20 @@ export function getInitialSubscriptionState(
   };
 }
 
-export function normalizeSubscriptionState(state: SubscriptionState): SubscriptionState {
+export function normalizeSubscriptionState(state: any): SubscriptionState {
   const today = getTodayDateStr();
   const monday = getCurrentWeekMondayStr();
   const nowMs = Date.now();
+  let rawTier = state?.tier;
+  if (rawTier === 'free') {
+    rawTier = 'basic';
+  }
   const validTier: SubscriptionTier =
-    state?.tier === 'basic' || state?.tier === 'business' || state?.tier === 'free'
-      ? state.tier
-      : 'free';
+    rawTier === 'business'
+      ? 'business'
+      : rawTier === 'pro'
+      ? 'pro'
+      : 'basic';
 
   let updated: SubscriptionState = {
     ...state,
@@ -393,21 +399,21 @@ export function canConsumeAiQuota(
     };
   }
 
-  if (state.tier === 'free') {
-    return {
-      allowed: false,
-      costCoins: 1,
-      reason:
-        'Free Tier includes 0 daily AI Quota Coins. Upgrade to Basic (5 coins/day) or Business (10 image coins/day + unlimited CRM/Text AI), or purchase a 50-Coin AI Booster Pack (valid 3 months) to use AI features.',
-    };
-  }
-
   if (state.tier === 'basic') {
     return {
       allowed: false,
       costCoins: 1,
       reason:
-        'You have consumed all 5 non-cumulative Daily AI Quota Coins on your Basic plan today. Purchase a 50-Coin AI Booster Pack (valid 3 months) or upgrade to Business (10 daily image generations + unlimited text/CRM AI).',
+        'Basic Tier includes 0 daily AI Quota Coins. Upgrade to Pro (5 coins/day) or Business (10 image coins/day + unlimited CRM/Text AI), or purchase a 50-Coin AI Booster Pack (valid 3 months) to use AI features.',
+    };
+  }
+
+  if (state.tier === 'pro') {
+    return {
+      allowed: false,
+      costCoins: 1,
+      reason:
+        'You have consumed all 5 non-cumulative Daily AI Quota Coins on your Pro plan today. Purchase a 50-Coin AI Booster Pack (valid 3 months) or upgrade to Business (10 daily image generations + unlimited text/CRM AI).',
     };
   }
 
@@ -526,10 +532,10 @@ export function purchaseAiBoosterPack(
 
 /**
  * Image Hub storage limit per category (Profile Photos or Cover Backgrounds):
- * Free: 3, Basic: 5, Business: 50
+ * Basic: 3, Pro: 5, Business: 50
  */
-export function getImageHubLimit(tier: SubscriptionTier = 'free'): number {
-  const spec = SUBSCRIPTION_TIER_SPECS[tier] || SUBSCRIPTION_TIER_SPECS.free;
+export function getImageHubLimit(tier: SubscriptionTier = 'basic'): number {
+  const spec = SUBSCRIPTION_TIER_SPECS[tier] || SUBSCRIPTION_TIER_SPECS.basic;
   return spec.maxImageHubPictures || 3;
 }
 
@@ -571,7 +577,7 @@ export function countHubImages(
  */
 export function checkImageHubQuota(
   profile?: { storedPictures?: Array<{ url?: string; context?: string; category?: string; aspectRatio?: string }>; storedBanners?: Array<{ url?: string }> } | null,
-  tier: SubscriptionTier = 'free',
+  tier: SubscriptionTier = 'basic',
   type: 'avatar' | 'banner' = 'avatar',
   incomingUrl?: string
 ): {
@@ -609,13 +615,13 @@ export function checkImageHubQuota(
   const typeLabel = type === 'avatar' ? 'profile photos' : 'cover backgrounds';
 
   if (currentCount >= maxAllowed) {
-    const nextTier = tier === 'free' ? 'Basic (5 images)' : tier === 'basic' ? 'Business (50 images)' : 'Business Enterprise';
+    const nextTier = tier === 'basic' ? 'Pro (5 images)' : tier === 'pro' ? 'Business (50 images)' : 'Business Enterprise';
     return {
       allowed: false,
       currentCount,
       maxAllowed,
       tier,
-      reason: `Image Hub storage limit reached (${currentCount}/${maxAllowed} ${typeLabel}). Your ${SUBSCRIPTION_TIER_SPECS[tier]?.name || 'Free'} plan includes up to ${maxAllowed} images. Upgrade to ${nextTier} or remove an existing picture to store more.`,
+      reason: `Image Hub storage limit reached (${currentCount}/${maxAllowed} ${typeLabel}). Your ${SUBSCRIPTION_TIER_SPECS[tier]?.name || 'Basic'} plan includes up to ${maxAllowed} images. Upgrade to ${nextTier} or remove an existing picture to store more.`,
     };
   }
 

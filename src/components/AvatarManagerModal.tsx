@@ -137,7 +137,7 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
     return true;
   });
 
-  const currentTier = subscription?.tier || 'free';
+  const currentTier = subscription?.tier || 'basic';
   const tierLimit = getImageHubLimit(currentTier);
   const avatarCount = allHubAssets.filter((p) => p.context !== 'banner' && p.aspectRatio !== '16:9').length;
   const bannerCount = allHubAssets.filter((p) => p.context === 'banner' || p.aspectRatio === '16:9').length;
@@ -979,7 +979,7 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
                     type="button"
                     onClick={() =>
                       onOpenSubscriptionModal(
-                        `Image Hub Storage: ${currentTier} plan allows up to ${tierLimit} images (3 for Free, 5 for Basic, 50 for Business). Upgrade to store more.`
+                        `Image Hub Storage: ${currentTier} plan allows up to ${tierLimit} images (3 for Basic, 5 for Pro, 50 for Business). Upgrade to store more.`
                       )
                     }
                     className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 underline"
@@ -998,7 +998,7 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
                     <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
                     <span>
                       <strong>Image Hub Storage Limit:</strong> You have reached the {currentTier} plan limit of{' '}
-                      {tierLimit} {vaultAssetFilter === 'banners' ? 'cover banners' : 'headshots'} (3 on Free, 5 on Basic, 50 on Business). Delete an image or upgrade to store more.
+                      {tierLimit} {vaultAssetFilter === 'banners' ? 'cover banners' : 'headshots'} (3 on Basic, 5 on Pro, 50 on Business). Delete an image or upgrade to store more.
                     </span>
                   </div>
                   {onOpenSubscriptionModal && currentTier !== 'business' && (

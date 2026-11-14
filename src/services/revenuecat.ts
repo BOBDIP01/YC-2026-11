@@ -13,12 +13,14 @@ import { getRuntimePlatform, isNativeMobilePlatform, apiFetch } from '../utils/a
 import { getPersistedAuthUser } from './firebase';
 
 export const REVENUECAT_ENTITLEMENTS = {
-  BASIC: 'basic_access',
+  PRO: 'pro_access',
+  BASIC: 'pro_access', // backward compatibility alias for $12 tier
   BUSINESS: 'business_access',
 } as const;
 
 export const REVENUECAT_PRODUCT_IDS = {
-  BASIC_MONTHLY: 'youconnect_basic_monthly',
+  PRO_MONTHLY: 'youconnect_pro_monthly',
+  BASIC_MONTHLY: 'youconnect_pro_monthly', // backward compatibility alias
   BUSINESS_MONTHLY: 'youconnect_business_monthly',
   AI_BOOSTER_50: 'youconnect_ai_booster_50',
 } as const;
@@ -106,10 +108,12 @@ export function mapCustomerInfoToTier(customerInfo: any): SubscriptionTier {
     : [];
   if (
     active[REVENUECAT_ENTITLEMENTS.BUSINESS] ||
+    active['business_access'] ||
     active['YouConnect Ultra'] ||
     subs.some(
       (s) =>
         s.startsWith(REVENUECAT_PRODUCT_IDS.BUSINESS_MONTHLY) ||
+        s.includes('business') ||
         s === 'Annual_Tier_2' ||
         s.startsWith('ultra_y_1')
     )
@@ -117,18 +121,22 @@ export function mapCustomerInfoToTier(customerInfo: any): SubscriptionTier {
     return 'business';
   }
   if (
-    active[REVENUECAT_ENTITLEMENTS.BASIC] ||
+    active[REVENUECAT_ENTITLEMENTS.PRO] ||
+    active['pro_access'] ||
+    active['basic_access'] || // legacy entitlement name for $12 tier
     active['YouConnect Pro'] ||
     subs.some(
       (s) =>
-        s.startsWith(REVENUECAT_PRODUCT_IDS.BASIC_MONTHLY) ||
+        s.startsWith(REVENUECAT_PRODUCT_IDS.PRO_MONTHLY) ||
+        s.startsWith('youconnect_basic_monthly') || // legacy product ID for $12 tier
+        s.includes('pro') ||
         s === 'Annual_Tier_1' ||
         s.startsWith('plus_y_1')
     )
   ) {
-    return 'basic';
+    return 'pro';
   }
-  return 'free';
+  return 'basic';
 }
 
 /**
@@ -235,8 +243,8 @@ export async function fetchRevenueCatOfferings(): Promise<RevenueCatPackageDispl
           const prodId = prod.identifier || pkg.identifier;
           const tier: SubscriptionTier | undefined = prodId.includes('business')
             ? 'business'
-            : prodId.includes('basic')
-            ? 'basic'
+            : prodId.includes('pro') || prodId.includes('basic')
+            ? 'pro'
             : undefined;
           return {
             identifier: pkg.identifier,
@@ -259,10 +267,10 @@ export async function fetchRevenueCatOfferings(): Promise<RevenueCatPackageDispl
 
   return [
     {
-      identifier: '$rc_monthly_basic',
-      productId: REVENUECAT_PRODUCT_IDS.BASIC_MONTHLY,
-      tier: 'basic',
-      title: 'YouConnect Basic Monthly',
+      identifier: '$rc_monthly_pro',
+      productId: REVENUECAT_PRODUCT_IDS.PRO_MONTHLY,
+      tier: 'pro',
+      title: 'YouConnect Pro Monthly',
       description: 'Unlimited Digital Cards, 5 Daily AI Quota Coins & Unlimited P2P Radar',
       priceString: '$12.00',
       priceAmountMicros: 12_000_000,
@@ -294,19 +302,19 @@ export async function fetchRevenueCatOfferings(): Promise<RevenueCatPackageDispl
 }
 
 /**
- * Executes a subscription tier purchase (`free` downgrade, `basic` $12/mo, or `business` $29/mo)
+ * Executes a subscription tier purchase (`basic` downgrade, `pro` $12/mo, or `business` $29/mo)
  * via RevenueCat StoreKit 2 / Google Play Billing.
  */
 export async function purchaseSubscriptionTierWithRevenueCat(
   targetTier: SubscriptionTier
 ): Promise<PurchaseOutcome> {
-  // Switching to Free tier cancels/downgrades at next renewal
-  if (targetTier === 'free') {
+  // Switching to Basic tier cancels/downgrades at next renewal
+  if (targetTier === 'basic') {
     return {
       success: true,
-      tier: 'free',
+      tier: 'basic',
       transactionId: `rc_downgrade_${Date.now()}`,
-      message: 'Plan set to Free Starter Tier ($0). Manage active store auto-renewals in device Account Settings.',
+      message: 'Plan set to Basic Tier ($0). Manage active store auto-renewals in device Account Settings.',
     };
   }
 
@@ -323,7 +331,7 @@ export async function purchaseSubscriptionTierWithRevenueCat(
   const targetProductId =
     targetTier === 'business'
       ? REVENUECAT_PRODUCT_IDS.BUSINESS_MONTHLY
-      : REVENUECAT_PRODUCT_IDS.BASIC_MONTHLY;
+      : REVENUECAT_PRODUCT_IDS.PRO_MONTHLY;
 
   // 1. Native Capacitor StoreKit 2 / Play Billing Flow
   if (rcNativePurchases) {
@@ -333,7 +341,9 @@ export async function purchaseSubscriptionTierWithRevenueCat(
       const matchingPkg = packages.find(
         (p) =>
           p.product?.identifier === targetProductId ||
-          p.identifier?.toLowerCase().includes(targetTier)
+          p.product?.identifier === 'youconnect_basic_monthly' ||
+          p.identifier?.toLowerCase().includes(targetTier) ||
+          (targetTier === 'pro' && p.identifier?.toLowerCase().includes('basic'))
       );
 
       let purchaseResult: any;
@@ -341,7 +351,7 @@ export async function purchaseSubscriptionTierWithRevenueCat(
         purchaseResult = await rcNativePurchases.purchasePackage({ aPackage: matchingPkg });
       } else if (typeof rcNativePurchases.getProducts === 'function') {
         const { products } = await rcNativePurchases.getProducts({
-          productIdentifiers: [targetProductId],
+          productIdentifiers: [targetProductId, 'youconnect_basic_monthly'],
         });
         if (products && products.length > 0) {
           purchaseResult = await rcNativePurchases.purchaseStoreProduct({
@@ -359,7 +369,7 @@ export async function purchaseSubscriptionTierWithRevenueCat(
       }
 
       const verifiedTier = mapCustomerInfoToTier(purchaseResult.customerInfo);
-      if (verifiedTier !== targetTier && !(targetTier === 'basic' && verifiedTier === 'business')) {
+      if (verifiedTier !== targetTier && !(targetTier === 'pro' && verifiedTier === 'business')) {
         return {
           success: false,
           message: 'Entitlement verification did not match the requested plan. No upgrade was applied.',
@@ -417,7 +427,7 @@ export async function purchaseSubscriptionTierWithRevenueCat(
       const purchaseRes = await rcWebInstance.purchase({ rcPackage: pkg });
       const customerInfo = purchaseRes?.customerInfo;
       const verifiedTier = mapCustomerInfoToTier(customerInfo);
-      if (verifiedTier !== targetTier && !(targetTier === 'basic' && verifiedTier === 'business')) {
+      if (verifiedTier !== targetTier && !(targetTier === 'pro' && verifiedTier === 'business')) {
         return {
           success: false,
           message: 'Subscription payment was not confirmed. No plan changes were made.',
@@ -670,13 +680,16 @@ export async function restorePurchasesWithRevenueCat(
     if (res.ok) {
       const data = await res.json();
       const rawTier = String(data?.tier || '').toLowerCase();
-      if (rawTier === 'free' || rawTier === 'basic' || rawTier === 'business') {
-        return {
-          success: true,
-          tier: rawTier as SubscriptionTier,
-          message: `Your purchases have been restored (${rawTier.toUpperCase()} plan active).`,
-        };
-      }
+      let resolvedTier: SubscriptionTier = 'basic';
+      if (rawTier === 'business') resolvedTier = 'business';
+      else if (rawTier === 'pro' || rawTier === 'basic') resolvedTier = 'pro';
+      else resolvedTier = 'basic';
+
+      return {
+        success: true,
+        tier: resolvedTier,
+        message: `Your purchases have been restored (${resolvedTier.toUpperCase()} plan active).`,
+      };
     }
   } catch {
     return {
