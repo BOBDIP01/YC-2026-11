@@ -39,12 +39,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuthModal,
   authUser,
 }) => {
-  const isKycVerified = Boolean(
-    profile.isVerified &&
-      profile.kycVerification?.isCompleted &&
-      profile.kycVerification?.traceabilityId
-  );
-
   const summary = getQuotaSummary(subscription);
 
   const navItems: {
@@ -94,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       label: 'Settings',
       shortLabel: 'Settings',
       icon: <Settings className="h-4 w-4 md:h-3.5 md:w-3.5" />,
-      title: 'Privacy, KYC verification, subscription & system settings',
+      title: 'Privacy, card security, subscription & system settings',
     },
   ];
 
@@ -111,15 +105,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-sm sm:text-lg font-bold tracking-tight text-white">
                 YouConnect
               </span>
-              {isKycVerified && (
-                <span
-                  className="flex items-center gap-1 text-[11px] font-medium text-emerald-400"
-                  title={`KYC Verified Identity · ${profile.kycVerification?.traceabilityId}`}
-                >
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  <span className="hidden lg:inline">Verified</span>
-                </span>
-              )}
             </div>
           </div>
 

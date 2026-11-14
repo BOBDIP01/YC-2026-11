@@ -180,37 +180,31 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
   // Live Time-Zone Clock State
   const [holderLocalTime, setHolderLocalTime] = useState<string>('');
 
-  const isKycVerified = Boolean(
-    profile.isVerified &&
-      profile.kycVerification?.isCompleted &&
-      profile.kycVerification?.traceabilityId
-  );
+  const cardSecurityNumber = card.cardSecurityNumber || 'YC-SEC-ACTIVE';
 
   const livePresence = card.livePresence || {
     enabled: true,
-    statusText: isKycVerified ? `Verified Identity · ${card.name}` : `Active Profile · ${card.name}`,
+    statusText: `Active Profile · ${card.name}`,
     availability: 'available' as const,
     timezone: 'America/Los_Angeles',
   };
 
-  // Ensure legacy visitor-oriented strings ("Available for Direct Connection", "Ask me about...") never show on user's own profile
+  // Ensure legacy visitor-oriented strings never show on user's own profile
   const rawStatusText = livePresence.statusText || '';
   const ownerStatusText =
     !rawStatusText ||
     rawStatusText.toLowerCase().includes('available for direct connection') ||
     rawStatusText.toLowerCase().includes('ask me') ||
-    (!isKycVerified && rawStatusText.toLowerCase().includes('verified identity'))
-      ? isKycVerified
-        ? `Verified Identity · ${card.name}`
-        : `Active Profile · ${card.name}`
+    rawStatusText.toLowerCase().includes('verified identity')
+      ? `Active Profile · ${card.name}`
       : rawStatusText;
 
   const storySpotlight = card.storySpotlight || {
     title: `${profile.workData?.company || profile.company} — Profile Overview`,
     subtitle: profile.workData?.bio || profile.bio || card.customTagline || profile.headline,
     badge: 'PROFILE HIGHLIGHTS',
-    metricLabel: isKycVerified ? 'KYC Registered Identity' : 'Profile Status',
-    metricValue: isKycVerified ? 'KYC Verified' : 'Standard',
+    metricLabel: 'Security Traceability',
+    metricValue: card.cardSecurityNumber ? 'Protected & Active' : 'Active',
   };
 
   useEffect(() => {
@@ -1563,14 +1557,7 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                             .join('') || 'YC'}
                         </div>
                       )}
-                      {isKycVerified && (
-                        <span
-                          className="absolute bottom-2 right-0.5 z-20 h-6 w-6 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow-[0_0_14px_rgba(16,185,129,0.9)]"
-                          title={`KYC Verified Identity · Traceability ID: ${profile.kycVerification?.traceabilityId}`}
-                        >
-                          <Check className="h-3.5 w-3.5 stroke-[3]" />
-                        </span>
-                      )}
+
                     </div>
 
                     {/* Foreground Stage Right Block: In split_columns, show floating Executive Brief on stage so Identity lives in Left Column below */}
@@ -1872,14 +1859,7 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                           }`,
                           { borderColor: card.accentColor }
                         )}
-                        {isKycVerified && (
-                          <span
-                            className="absolute -bottom-1 -right-1 z-20 h-6 w-6 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.8)]"
-                            title={`KYC Verified Identity · Traceability ID: ${profile.kycVerification?.traceabilityId}`}
-                          >
-                            <Check className="h-3.5 w-3.5 stroke-[3]" />
-                          </span>
-                        )}
+
                       </div>
 
                       <div className="min-w-0 flex-1">
@@ -1955,14 +1935,7 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                             'h-14 w-14 sm:h-16 sm:w-16 rounded-2xl border-2 shadow-md',
                             { borderColor: card.accentColor }
                           )}
-                          {isKycVerified && (
-                            <span
-                              className="absolute -bottom-1 -right-1 z-20 h-5 w-5 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow"
-                              title={`KYC Verified Identity · Traceability ID: ${profile.kycVerification?.traceabilityId}`}
-                            >
-                              <Check className="h-3 w-3 stroke-[3]" />
-                            </span>
-                          )}
+
                         </div>
                       )}
 
@@ -2220,14 +2193,7 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                             'h-14 w-14 sm:h-16 sm:w-16 rounded-xl border-2 shadow-md',
                             { borderColor: card.accentColor }
                           )}
-                          {isKycVerified && (
-                            <span
-                              className="absolute -bottom-1 -right-1 z-20 h-5 w-5 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow"
-                              title={`KYC Verified Identity · Traceability ID: ${profile.kycVerification?.traceabilityId}`}
-                            >
-                              <Check className="h-3 w-3 stroke-[3]" />
-                            </span>
-                          )}
+
                         </div>
                       )}
                       {(card.customTagline || profile.headline) && (
@@ -2378,14 +2344,7 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                             'w-full h-24 sm:h-28 rounded-xl border shadow-md',
                             { borderColor: card.accentColor }
                           )}
-                          {isKycVerified && (
-                            <span
-                              className="absolute bottom-1.5 right-1.5 z-20 h-5 w-5 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow"
-                              title={`KYC Verified Identity · Traceability ID: ${profile.kycVerification?.traceabilityId}`}
-                            >
-                              <Check className="h-3 w-3 stroke-[3]" />
-                            </span>
-                          )}
+
                         </div>
                       )}
                       <p className={`text-[11px] italic leading-relaxed line-clamp-3 ${themeConfig.subtleText}`}>
@@ -2453,11 +2412,6 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                           {renderFramedPortrait(
                             'h-14 w-14 rounded-lg border',
                             { borderColor: card.accentColor }
-                          )}
-                          {isKycVerified && (
-                            <span className="absolute -bottom-1 -right-1 z-20 h-4 w-4 rounded-full bg-emerald-500 border border-slate-950 text-slate-950 flex items-center justify-center">
-                              <Check className="h-2.5 w-2.5 stroke-[3]" />
-                            </span>
                           )}
                         </div>
                         <span className="text-[9px] uppercase tracking-widest opacity-60">
@@ -2917,14 +2871,6 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                             .join('') || 'YC'}
                         </div>
                       )}
-                      {isKycVerified && (
-                        <span
-                          className="absolute bottom-2 right-0.5 h-6 w-6 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.8)]"
-                          title={`KYC Verified Identity · Traceability ID: ${profile.kycVerification?.traceabilityId}`}
-                        >
-                          <Check className="h-3.5 w-3.5 stroke-[3]" />
-                        </span>
-                      )}
                     </div>
                     <div
                       className="min-w-0 flex-1 pb-3.5"
@@ -2974,11 +2920,6 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                     {renderFramedPortrait('h-20 w-20 rounded-full border-2 shadow-xl', {
                       borderColor: card.accentColor,
                     })}
-                    {isKycVerified && (
-                      <span className="absolute -bottom-1 -right-1 z-20 h-6 w-6 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow">
-                        <Check className="h-3.5 w-3.5 stroke-[3]" />
-                      </span>
-                    )}
                   </div>
                   <div className="min-w-0 max-w-full">
                     <div className="inline-flex items-center gap-2 justify-center">
@@ -3026,11 +2967,6 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                     {renderFramedPortrait('h-20 w-20 rounded-2xl border-2', {
                       borderColor: card.accentColor,
                     })}
-                    {isKycVerified && (
-                      <span className="absolute -bottom-1.5 -left-1.5 z-20 h-6 w-6 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow">
-                        <Check className="h-3.5 w-3.5 stroke-[3]" />
-                      </span>
-                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -3217,17 +3153,6 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                             ? '10px 20px 28px -4px rgba(0,0,0,0.92), 0 0 18px rgba(255,255,255,0.12)'
                             : undefined,
                       }
-                    )}
-                    {isKycVerified && (
-                      <span
-                        className="absolute -bottom-1.5 -right-1.5 z-20 h-6 w-6 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.8)]"
-                        style={{
-                          transform: parallaxEnabled ? 'translateZ(14px)' : undefined,
-                        }}
-                        title={`KYC Verified Identity · Traceability ID: ${profile.kycVerification?.traceabilityId}`}
-                      >
-                        <Check className="h-3.5 w-3.5 stroke-[3]" />
-                      </span>
                     )}
                   </div>
                   <div
@@ -3956,14 +3881,6 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                   themeConfig.isLight ? 'border-stone-900/30' : 'border-white/40'
                 }`
               )}
-              {isKycVerified && (
-                <span
-                  className="absolute -bottom-1 -right-1 z-20 h-5 w-5 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow"
-                  title={`KYC Verified · ${profile.kycVerification?.traceabilityId}`}
-                >
-                  <Check className="h-3 w-3 stroke-[3]" />
-                </span>
-              )}
             </div>
             <div className="min-w-0">
               <h4
@@ -3972,7 +3889,6 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
                 }`}
               >
                 <span className="truncate">{profile.name}</span>
-                {isKycVerified && <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />}
               </h4>
               {card.visibleFields.role && (
                 <p className={`text-xs font-semibold truncate ${themeConfig.accentText}`}>
@@ -4071,7 +3987,12 @@ export const DigitalCardRenderer: React.FC<DigitalCardRendererProps> = ({
           {/* High Density Barcode / QR Section */}
           <div className="relative z-10 p-4 bg-white rounded-2xl flex flex-col items-center justify-center space-y-2 shadow-inner">
             {qrDataUrl && <img src={qrDataUrl} alt="Pass Barcode" className="h-36 w-36" />}
-            <div className="font-mono text-xs font-bold tracking-widest text-black">YC-PASS-8840-X9</div>
+            <div className="font-mono text-xs font-bold tracking-widest text-black">
+              {card.cardSecurityNumber || 'YC-PASS-8840-X9'}
+            </div>
+            <div className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">
+              Cryptographic Card Security ID
+            </div>
           </div>
 
           {walletNotice && (

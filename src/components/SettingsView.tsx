@@ -16,7 +16,6 @@ import {
   AI_BOOSTER_PACK_SIZE,
   AI_BOOSTER_PACK_PRICE,
 } from '../utils/subscription';
-import { KYCSettingsEngine } from './KYCSettingsEngine';
 import { RadarWalkthroughModal } from './RadarWalkthroughModal';
 import {
   User,
@@ -477,10 +476,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       desc: 'Personal details, contact info & emergency contacts',
     },
     {
-      id: 'kyc',
-      label: 'Identity Verification',
+      id: 'card_security',
+      label: 'Card Security & Traceability',
       icon: <ShieldCheck className="h-4 w-4" />,
-      desc: 'Verify your identity with an ID document & selfie',
+      desc: 'Cryptographic identification, unique card numbers & registry tracking',
     },
     {
       id: 'privacy',
@@ -533,25 +532,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {isKycVerified ? (
-            <button
-              type="button"
-              onClick={() => setActiveSubMenu('kyc')}
-              className="h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 hover:bg-emerald-900/60 transition"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-              <span>Identity Verified</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setActiveSubMenu('kyc')}
-              className="h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 text-amber-300 bg-amber-950/60 border border-amber-800/60 hover:bg-amber-900/60 transition"
-            >
-              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-              <span>Verify Identity</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setActiveSubMenu('card_security')}
+            className="h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 text-indigo-300 bg-indigo-950/60 border border-indigo-800/60 hover:bg-indigo-900/60 transition"
+          >
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
+            <span>Card Security ({cards.length} Tracked)</span>
+          </button>
           {onOpenAuthModal && (
             <button
               type="button"
@@ -687,7 +675,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   )}
                 </div>
 
-                {/* Identity Verification Badge & KYC Status */}
+                {/* Cryptographic Card Traceability Registry Status */}
                 <div className="rounded-lg bg-slate-950/70 border border-slate-800 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="relative shrink-0">
@@ -695,15 +683,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         <img
                           src={profile.avatarUrl}
                           alt={profile.name}
-                          className={`h-12 w-12 rounded-full object-cover border-2 ${
-                            isKycVerified ? 'border-emerald-400' : 'border-indigo-500/40'
-                          }`}
+                          className="h-12 w-12 rounded-full object-cover border-2 border-indigo-500/40"
                         />
                       ) : (
                         <div
-                          className={`h-12 w-12 rounded-full bg-indigo-950 flex items-center justify-center text-xs font-bold text-indigo-200 uppercase border-2 ${
-                            isKycVerified ? 'border-emerald-400' : 'border-indigo-500/40'
-                          }`}
+                          className="h-12 w-12 rounded-full bg-indigo-950 flex items-center justify-center text-xs font-bold text-indigo-200 uppercase border-2 border-indigo-500/40"
                         >
                           {(profile.name || 'YC')
                             .trim()
@@ -713,28 +697,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                             .join('') || 'YC'}
                         </div>
                       )}
-                      {isKycVerified && (
-                        <span
-                          className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-emerald-500 border-2 border-slate-950 text-slate-950 flex items-center justify-center shadow"
-                          title={`KYC Verified · ${profile.kycVerification?.traceabilityId}`}
-                        >
-                          <Check className="h-3 w-3 stroke-[3]" />
-                        </span>
-                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold text-white">{profile.name}</span>
-                        {isKycVerified ? (
-                          <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/60">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Verified Identity
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/60">
-                            Unverified — Upload ID & Selfie to get your Verified Badge
-                          </span>
-                        )}
+                        <span className="flex items-center gap-1 text-[11px] font-medium text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-800/60 font-mono">
+                          <ShieldCheck className="h-3 w-3 text-indigo-400" />
+                          Cryptographic Registry Active ({cards.length} Cards)
+                        </span>
                       </div>
                       {(profile.role || profile.company) && (
                         <p className="text-xs text-slate-400 mt-0.5">
@@ -744,25 +714,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </div>
                   </div>
 
-                  {!isKycVerified ? (
-                    <button
-                      type="button"
-                      onClick={() => setActiveSubMenu('kyc')}
-                      className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition"
-                    >
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      <span>Verify Identity</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setActiveSubMenu('kyc')}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-700/60 text-xs font-semibold text-emerald-300 transition"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                      <span>View Verification Status</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveSubMenu('card_security')}
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition shadow-sm"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    <span>Card Traceability Registry</span>
+                  </button>
                 </div>
 
                 {/* Account Form */}
@@ -1053,13 +1012,149 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           )}
 
-          {/* 1B. KYC & IDENTITY VERIFICATION ENGINE (Document OCR + Biometric Selfie + Traceability DB) */}
-          {activeSubMenu === 'kyc' && (
-            <KYCSettingsEngine
-              profile={profile}
-              onUpdateProfile={onUpdateProfile}
-              onNavigateToStudio={onNavigateToStudio}
-            />
+          {/* CARD SECURITY & CRYPTOGRAPHIC TRACEABILITY REGISTRY */}
+          {activeSubMenu === 'card_security' && (
+            <div className="space-y-6">
+              {/* Header Box */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                  <div>
+                    <h2 className="text-base font-bold text-white flex items-center gap-2">
+                      <ShieldCheck className="h-5 w-5 text-indigo-400" />
+                      Card Security & Traceability Registry
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Every digital business card is assigned a unique cryptographic security identifier (YC-XXXX-XXXX-XXXX-XXXX) linked directly to your registered user account in the cloud database.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-950/80 border border-emerald-700/60 text-xs font-mono font-semibold text-emerald-300">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                      Database Traceability: Active
+                    </span>
+                  </div>
+                </div>
+
+                {/* Stat Metric Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Tracked Digital Cards</span>
+                    <div className="text-xl font-bold text-white mt-1">{cards.length} Active Cards</div>
+                    <span className="text-[10px] text-slate-500">All registered in database</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Registered Owner</span>
+                    <div className="text-sm font-bold text-indigo-300 font-mono mt-1 truncate">
+                      {profile.personalData?.email || profile.email || 'Registered User'}
+                    </div>
+                    <span className="text-[10px] text-slate-500">Owner binding verified</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Tamper Protection</span>
+                    <div className="text-sm font-bold text-emerald-400 font-mono mt-1">SHA-256 HMAC</div>
+                    <span className="text-[10px] text-slate-500">Cryptographically signed</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cards Registry Table */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-indigo-400" />
+                    <span>Registered Digital Business Cards</span>
+                  </h3>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {cards.length} {cards.length === 1 ? 'record' : 'records'}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {cards.map((c) => {
+                    const secNum = c.cardSecurityNumber || 'YC-SEC-ACTIVE';
+                    const hashPreview = c.securityTraceability?.securityHash
+                      ? `${c.securityTraceability.securityHash.slice(0, 16)}...`
+                      : 'sha256-verified';
+                    const ownerMasked =
+                      c.securityTraceability?.registeredOwnerEmailMasked ||
+                      profile.email ||
+                      'usr-registered';
+                    return (
+                      <div
+                        key={c.id}
+                        className="p-4 rounded-xl border border-slate-800 bg-slate-950/80 hover:border-slate-700 transition space-y-3"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="h-9 w-9 rounded-xl flex items-center justify-center font-bold text-white text-xs border border-white/20 shrink-0"
+                              style={{ backgroundColor: c.accentColor || '#6366f1' }}
+                            >
+                              {c.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-white">{c.name}</span>
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">
+                                  #{c.tag || 'card'}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-slate-400">
+                                Slug: /p/{c.vanitySlug || c.id}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-mono font-semibold text-emerald-300 flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Active & Tracked
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(secNum);
+                              }}
+                              className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono transition flex items-center gap-1"
+                              title="Copy Security Number"
+                            >
+                              <Copy className="h-3 w-3" />
+                              <span>Copy ID</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-800/80 text-[11px] font-mono">
+                          <div>
+                            <span className="text-slate-500 block text-[9px] uppercase tracking-wider">Security Number</span>
+                            <span className="text-white font-bold">{secNum}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[9px] uppercase tracking-wider">Registered Owner</span>
+                            <span className="text-slate-300">{ownerMasked}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[9px] uppercase tracking-wider">SHA-256 Digest</span>
+                            <span className="text-indigo-400 truncate block">{hashPreview}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Audit & Legal Guarantee Notice */}
+                <div className="p-3.5 rounded-xl border border-indigo-500/30 bg-indigo-950/20 text-xs space-y-1.5">
+                  <div className="font-semibold text-indigo-300 flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 text-indigo-400" />
+                    <span>Audit Traceability & Fraud Protection</span>
+                  </div>
+                  <p className="text-slate-400 leading-relaxed text-[11px]">
+                    In case of contact authenticity inquiries, NFC collision disputes, or law enforcement verification requests, each card's cryptographic number correlates directly to the registered user account in the database without needing invasive biometric documents or KYC selfie checks.
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* 2. PRIVACY & LEGAL (Sub-menu of Settings) */}

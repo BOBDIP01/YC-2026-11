@@ -191,9 +191,9 @@ export const PublicCardView: React.FC<PublicCardViewProps> = ({
                   Card
                 </span>
               </span>
-              <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
-                <ShieldCheck className="h-2.5 w-2.5" />
-                <span>Verified Direct Profile</span>
+              <span className="text-[10px] text-indigo-300 font-mono flex items-center gap-1">
+                <ShieldCheck className="h-2.5 w-2.5 text-indigo-400" />
+                <span>Security ID: {card.cardSecurityNumber || 'YC-SEC-ACTIVE'}</span>
               </span>
             </div>
           </div>
@@ -606,12 +606,17 @@ export const PublicCardView: React.FC<PublicCardViewProps> = ({
         <div className="text-[10px] text-slate-400">
           Powered by <strong className="text-slate-300">YouConnect</strong> Digital Identity Architecture
         </div>
-        <div className="flex items-center justify-center gap-3 text-[10px] text-indigo-400">
-          <span className="flex items-center gap-1">
-            <ShieldCheck className="h-3 w-3" /> Encrypted vCard 3.0
-          </span>
-          <span>·</span>
-          <span>NFC & Instant QR Ready</span>
+        <div className="flex flex-col items-center justify-center gap-1 text-[10px] text-slate-400">
+          <div className="flex items-center justify-center gap-3 text-indigo-400 font-mono">
+            <span className="flex items-center gap-1">
+              <ShieldCheck className="h-3 w-3" /> Card ID: {card.cardSecurityNumber || 'YC-SEC-ACTIVE'}
+            </span>
+            <span>·</span>
+            <span>Cryptographic Registry</span>
+          </div>
+          <div className="text-[9px] text-slate-500">
+            Card-to-User Traceability ID stored in database registry
+          </div>
         </div>
       </footer>
     </div>

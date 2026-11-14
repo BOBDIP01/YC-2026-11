@@ -48,7 +48,7 @@ import {
 interface MasterProfileEditorProps {
   profile: MasterProfile;
   onUpdateProfile: (updated: MasterProfile) => void;
-  onOpenKYCModal: () => void;
+  onOpenKYCModal?: () => void;
   onOpenBioModal: () => void;
   onOpenAvatarModal: (tab: 'vault' | 'ai') => void;
   onOpenImageHub?: (subTab: 'avatar' | 'background') => void;
@@ -528,15 +528,6 @@ export const MasterProfileEditor: React.FC<MasterProfileEditorProps> = ({
                   {profile.circleName && (
                     <span className="text-[11px] font-mono text-indigo-300 bg-indigo-950/60 border border-indigo-800/60 px-2 py-0.5 rounded">
                       {profile.circleName}
-                    </span>
-                  )}
-                  {profile.isVerified && profile.kycVerification?.isCompleted && profile.kycVerification?.traceabilityId && (
-                    <span
-                      className="text-[10px] font-mono font-semibold text-emerald-300 bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded flex items-center gap-1"
-                      title={`KYC Verified · Traceability ID: ${profile.kycVerification.traceabilityId}`}
-                    >
-                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-                      <span>Verified Identity</span>
                     </span>
                   )}
                 </div>

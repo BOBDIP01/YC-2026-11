@@ -287,7 +287,7 @@ export interface MasterProfile {
   circleType?: string;
   socials: SocialLinks;
   socialAccounts?: SocialAccountEntry[];
-  isVerified: boolean;
+  isVerified?: boolean;
   verifiedAt?: string;
   ccpaDoNotSell: boolean;
   aiCredits: number;
@@ -297,27 +297,11 @@ export interface MasterProfile {
   gender?: string; // LGBTQ+ inclusive (e.g. Non-binary, Genderqueer, Agender, Transgender Woman/Man, Cisgender, Self-described, etc.)
   pronouns?: string; // e.g. they/them, she/her, he/him, ze/zir, any
 
-  // Document + Selfie KYC Verification & Database Traceability
+  // Legacy field kept optional for backward compatibility
   kycVerification?: {
-    isCompleted: boolean;
-    firstName: string;
-    lastName: string;
-    email: string;
-    verifiedAt?: string;
-    kycLevel?: 'Level-1 Automatic' | 'Level-2 Enhanced' | 'Level-3 Biometric Document & Selfie';
+    isCompleted?: boolean;
     traceabilityId?: string;
-    traceabilityHash?: string;
-    documentType?: string;
-    issuingCountry?: string;
-    documentNumberMasked?: string;
-    dateOfBirth?: string;
-    expirationDate?: string;
-    documentConfidenceScore?: number;
-    biometricMatchScore?: number;
-    livenessVerified?: boolean;
-    comparisonSummary?: string;
-    documentThumbUrl?: string;
-    selfieThumbUrl?: string;
+    verifiedAt?: string;
   };
 
   // Separated Personal vs. Work & Standard Rubrica
@@ -374,11 +358,23 @@ export interface StoryDeckSpotlight {
 export type CardLogoPosition = 'top_right' | 'identity_row' | 'top_left';
 export type CardLogoSize = 'compact' | 'standard' | 'prominent';
 
+export interface CardSecurityTraceability {
+  cardNumber: string;            // Unique encrypted card identifier, e.g. "YC-7E92-3B41-8F05-9D2A"
+  securityHash: string;          // SHA-256 cryptographic fingerprint linking card to user
+  registeredOwnerId: string;     // Registered User UID or cryptographic hash
+  registeredOwnerEmailMasked?: string; // e.g. "r***o@domain.com"
+  issuedAt: string;              // ISO timestamp
+  status: 'active' | 'revoked';
+}
+
 export interface DigitalCard {
   id: string;
   name: string;
   category: ProfileCategory;
   tag: string;
+  // Unique Cryptographic Number associating the card to the registered user in the database
+  cardSecurityNumber?: string;
+  securityTraceability?: CardSecurityTraceability;
   // Auto-populated from Identity Settings on card creation, editable per card
   holderFirstName?: string;
   holderLastName?: string;
@@ -648,7 +644,7 @@ export type AppearanceMode = 'day' | 'night' | 'auto';
 
 export type SettingsSubMenu =
   | 'account'
-  | 'kyc'
+  | 'card_security'
   | 'privacy'
   | 'storage'
   | 'subscription'

@@ -31,7 +31,6 @@ import { AIBioModal } from './AIBioModal';
 import { AvatarManagerModal } from './AvatarManagerModal';
 import { CreatePersonaModal } from './CreatePersonaModal';
 import { CreateCardModal } from './CreateCardModal';
-import { KYCRegistrationModal } from './KYCRegistrationModal';
 import { MasterProfileEditor } from './MasterProfileEditor';
 import { DigitalCardRenderer } from './DigitalCardRenderer';
 import { EmailSignatureModal } from './EmailSignatureModal';
@@ -147,7 +146,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   const [avatarModalTab, setAvatarModalTab] = useState<'vault' | 'library' | 'camera' | 'ai'>('vault');
   const [isCreatePersonaModalOpen, setIsCreatePersonaModalOpen] = useState(false);
   const [isCreateCardModalOpen, setIsCreateCardModalOpen] = useState(false);
-  const [isKYCModalOpen, setIsKYCModalOpen] = useState(false);
   const [isEmailSignatureModalOpen, setIsEmailSignatureModalOpen] = useState(false);
   const [isAiBannerModalOpen, setIsAiBannerModalOpen] = useState(false);
   const [bannerSourceTab, setBannerSourceTab] = useState<'hub' | 'presets'>('presets');
@@ -1238,6 +1236,19 @@ export const CardStudio: React.FC<CardStudioProps> = ({
     }
   };
 
+  const getCardPortrait = (c: DigitalCard) => {
+    if (c.avatarUrl && c.avatarUrl.trim()) return c.avatarUrl.trim();
+    const matchingPersona = allPersonas?.find(
+      (p) =>
+        p.id === c.id ||
+        p.id.replace('persona-', '') === c.id.replace('card-', '') ||
+        p.tag?.toLowerCase() === c.tag?.toLowerCase() ||
+        p.circleName?.toLowerCase() === c.name?.toLowerCase()
+    );
+    if (matchingPersona?.avatarUrl?.trim()) return matchingPersona.avatarUrl.trim();
+    return profile.avatarUrl?.trim() || '';
+  };
+
   return (
     <div className="mx-auto w-full max-w-[1720px] px-3 sm:px-6 lg:px-8 xl:px-10 py-5 sm:py-7">
       {/* Sticky Compact Mini-Card Bar on Mobile (< lg) & Top Card Bar on Desktop */}
@@ -1252,9 +1263,9 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="relative shrink-0">
-                {(activeCard.avatarUrl || profile.avatarUrl) ? (
+                {getCardPortrait(activeCard) ? (
                   <img
-                    src={activeCard.avatarUrl || profile.avatarUrl}
+                    src={getCardPortrait(activeCard)}
                     alt={activeCard.name}
                     className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover border border-indigo-400/50"
                   />
@@ -1301,7 +1312,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                 {cards.map((c, idx) => {
                   const isActive = c.id === activeCard.id;
                   const isLockedByBasicTier = subscription?.tier === 'basic' && idx >= 2;
-                  const cardPortrait = c.avatarUrl || profile.avatarUrl;
+                  const cardPortrait = getCardPortrait(c);
                   return (
                     <button
                       key={c.id}
@@ -1317,6 +1328,16 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                           return;
                         }
                         onSelectCard(c);
+                        const matchingPersona = allPersonas?.find(
+                          (p) =>
+                            p.id === c.id ||
+                            p.id.replace('persona-', '') === c.id.replace('card-', '') ||
+                            p.tag?.toLowerCase() === c.tag?.toLowerCase() ||
+                            p.circleName?.toLowerCase() === c.name?.toLowerCase()
+                        );
+                        if (matchingPersona && onSelectPersona) {
+                          onSelectPersona(matchingPersona.id);
+                        }
                         setIsCardSelectorOpen(false);
                       }}
                       className={`w-full flex items-center justify-between gap-2.5 p-2 rounded-lg text-xs transition ${
@@ -1939,7 +1960,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                   onUpdateProfile={onUpdateProfile}
                   onUpdateCard={onUpdateCard}
                   onConsumeAiCoin={onConsumeAiCoin}
-                  onOpenKYCModal={() => setIsKYCModalOpen(true)}
                   onOpenBioModal={() => setIsBioModalOpen(true)}
                   onOpenImageHub={(sub) => {
                     setOpenAccordions((prev) => ({
@@ -1996,7 +2016,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                   onUpdateProfile={onUpdateProfile}
                   onUpdateCard={onUpdateCard}
                   onConsumeAiCoin={onConsumeAiCoin}
-                  onOpenKYCModal={() => setIsKYCModalOpen(true)}
                   onOpenBioModal={() => setIsBioModalOpen(true)}
                   onOpenImageHub={(sub) => {
                     setOpenAccordions((prev) => ({
@@ -2053,7 +2072,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                   onUpdateProfile={onUpdateProfile}
                   onUpdateCard={onUpdateCard}
                   onConsumeAiCoin={onConsumeAiCoin}
-                  onOpenKYCModal={() => setIsKYCModalOpen(true)}
                   onOpenBioModal={() => setIsBioModalOpen(true)}
                   onOpenImageHub={(sub) => {
                     setOpenAccordions((prev) => ({
@@ -3377,6 +3395,10 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                                       ...activeCard,
                                       avatarUrl: pic.url,
                                       previousAvatarUrl: currentCardPortrait,
+                                    });
+                                    onUpdateProfile({
+                                      ...profile,
+                                      avatarUrl: pic.url,
                                     });
                                     setAvatarCreationStatus(`Applied "${pic.name}" to ${activeCard.name}.`);
                                     setTimeout(() => setAvatarCreationStatus(null), 3000);
@@ -5384,6 +5406,36 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                           className="w-full rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none"
                         />
                       </div>
+
+                      {/* Cryptographic Security & Traceability Card Badge */}
+                      <div className="p-3 rounded-xl border border-indigo-500/30 bg-indigo-950/20 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
+                            <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />
+                            <span>Card Traceability & Cryptographic ID</span>
+                          </span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                            Tracked in Database
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                          <div>
+                            <div className="text-[10px] text-slate-400 font-mono">Unique Security Number</div>
+                            <div className="font-mono font-bold text-white tracking-wider">
+                              {activeCard.cardSecurityNumber || 'YC-SEC-ACTIVE'}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-400 font-mono">Registered Account Trace</div>
+                            <div className="font-mono text-slate-300 truncate">
+                              {activeCard.securityTraceability?.registeredOwnerEmailMasked || profile.email || 'Registered User'}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-400 leading-snug">
+                          Every digital card is bound to your account with a tamper-proof cryptographic fingerprint, providing audit-trail verification across QR links and NFC shares.
+                        </p>
+                      </div>
                     </div>
 
                     {/* Video Business Card Pitch */}
@@ -5466,7 +5518,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
                   onUpdateProfile={onUpdateProfile}
                   onUpdateCard={onUpdateCard}
                   onConsumeAiCoin={onConsumeAiCoin}
-                  onOpenKYCModal={() => setIsKYCModalOpen(true)}
                   onOpenBioModal={() => setIsBioModalOpen(true)}
                   onOpenImageHub={(sub) => {
                     setOpenAccordions((prev) => ({
@@ -5552,13 +5603,6 @@ export const CardStudio: React.FC<CardStudioProps> = ({
         }}
       />
 
-      {/* Automatic KYC Registration Modal */}
-      <KYCRegistrationModal
-        isOpen={isKYCModalOpen}
-        onClose={() => setIsKYCModalOpen(false)}
-        profile={profile}
-        onUpdateProfile={onUpdateProfile}
-      />
 
       {/* Interactive Email Signature Generator */}
       <EmailSignatureModal

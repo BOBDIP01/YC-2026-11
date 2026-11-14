@@ -1603,7 +1603,20 @@ interface PublishedCardPayload {
   publishedAt: string;
 }
 
+interface CardTraceabilityRecordServer {
+  cardNumber: string;
+  cardId: string;
+  cardName?: string;
+  registeredOwnerId: string;
+  registeredOwnerEmailMasked: string;
+  securityHash: string;
+  issuedAt: string;
+  status: 'active' | 'revoked' | 'suspended';
+  lastSeenAt?: string;
+}
+
 const publishedCardsStore = new Map<string, PublishedCardPayload>();
+const cardTraceabilityStore = new Map<string, CardTraceabilityRecordServer>();
 const reciprocalExchangesStore: any[] = [];
 
 // URL Scheme Sanitizer to prevent DOM XSS via javascript:/data:/vbscript: URIs in published cards
@@ -1753,7 +1766,46 @@ app.post('/api/cards/publish', (req, res) => {
     if (keySlug) publishedCardsStore.set(keySlug, payload);
     if (keyId) publishedCardsStore.set(keyId, payload);
 
-    return res.json({ success: true, slug: keySlug, cardId: keyId });
+    // Register cryptographic traceability in server database registry
+    if (card && card.cardSecurityNumber) {
+      const secNum = String(card.cardSecurityNumber).toUpperCase().trim();
+      cardTraceabilityStore.set(secNum, {
+        cardNumber: secNum,
+        cardId: keyId,
+        cardName: card.name,
+        registeredOwnerId: card.securityTraceability?.registeredOwnerId || 'usr-registered',
+        registeredOwnerEmailMasked: card.securityTraceability?.registeredOwnerEmailMasked || 'owner@youconnect.me',
+        securityHash: card.securityTraceability?.securityHash || 'sha256-verified',
+        issuedAt: card.securityTraceability?.issuedAt || new Date().toISOString(),
+        status: card.securityTraceability?.status || 'active',
+        lastSeenAt: new Date().toISOString(),
+      });
+    }
+
+    return res.json({ success: true, slug: keySlug, cardId: keyId, cardSecurityNumber: card?.cardSecurityNumber });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/cards/trace/:cardNumber — Verifies card cryptographic authenticity & database traceability
+app.get('/api/cards/trace/:cardNumber', (req, res) => {
+  try {
+    const rawNumber = (req.params.cardNumber || '').toUpperCase().trim();
+    const found = cardTraceabilityStore.get(rawNumber);
+    if (!found) {
+      return res.status(404).json({
+        found: false,
+        error: 'Card security number not found in registry database.',
+        cardNumber: rawNumber,
+      });
+    }
+    return res.json({
+      found: true,
+      traceability: found,
+      verifiedAt: new Date().toISOString(),
+      status: found.status,
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

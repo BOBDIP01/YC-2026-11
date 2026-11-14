@@ -16,6 +16,10 @@ import {
   consumeAiQuota,
   purchaseAiBoosterPack,
 } from './utils/subscription';
+import {
+  ensureCardSecurityTraceability,
+  ensureAllCardsSecurityTraceability,
+} from './utils/cardSecurity';
 import { Navbar } from './components/Navbar';
 import { CardStudio } from './components/CardStudio';
 import { RadarView } from './components/RadarView';
@@ -443,9 +447,6 @@ export default function App() {
       try {
         const parsed: MasterProfile[] = JSON.parse(saved);
         return parsed.map((p) => {
-          const hasValidKycTraceability = Boolean(
-            p.kycVerification?.isCompleted && p.kycVerification?.traceabilityId
-          );
           const uniquePics = (p.storedPictures || []).filter(
             (pic, idx, arr) => pic?.url && arr.findIndex((x) => x?.url?.trim() === pic.url.trim()) === idx
           );
@@ -456,8 +457,6 @@ export default function App() {
             ...p,
             storedPictures: uniquePics,
             storedBanners: uniqueBanners,
-            isVerified: hasValidKycTraceability ? true : false,
-            kycVerification: hasValidKycTraceability ? p.kycVerification : undefined,
           };
         });
       } catch {
@@ -517,35 +516,47 @@ export default function App() {
     if (saved) {
       try {
         const parsed: DigitalCard[] = JSON.parse(saved);
-        return parsed.map((c) => ({
-          ...c,
-          primaryCta: undefined,
-          videoIntroUrl: c.videoIntroUrl?.includes('dQw4w9WgXcQ') ? '' : c.videoIntroUrl,
-          livePresence: c.livePresence
-            ? {
-                ...c.livePresence,
-                icebreakerPrompt: undefined,
-                statusText:
-                  c.livePresence.statusText &&
-                  !c.livePresence.statusText.toLowerCase().includes('available for direct connection') &&
-                  !c.livePresence.statusText.toLowerCase().includes('open for')
-                    ? c.livePresence.statusText
-                    : `Verified Identity · ${c.name}`,
-              }
-            : undefined,
-          storySpotlight: c.storySpotlight
-            ? {
-                ...c.storySpotlight,
-                ctaLabel: undefined,
-                ctaUrl: undefined,
-              }
-            : undefined,
-        }));
+        const sanitizedCards = parsed.map((c) => {
+          const matchingPreset = DEFAULT_DIGITAL_CARDS.find((p) => p.id === c.id);
+          const matchingPersona = PERSONA_PRESETS.find(
+            (p) =>
+              p.id === c.id ||
+              p.id.replace('persona-', '') === c.id.replace('card-', '') ||
+              p.tag?.toLowerCase() === c.tag?.toLowerCase()
+          );
+          return {
+            ...c,
+            avatarUrl: c.avatarUrl || matchingPreset?.avatarUrl || matchingPersona?.avatarUrl,
+            primaryCta: undefined,
+            videoIntroUrl: c.videoIntroUrl?.includes('dQw4w9WgXcQ') ? '' : c.videoIntroUrl,
+            livePresence: c.livePresence
+              ? {
+                  ...c.livePresence,
+                  icebreakerPrompt: undefined,
+                  statusText:
+                    c.livePresence.statusText &&
+                    !c.livePresence.statusText.toLowerCase().includes('available for direct connection') &&
+                    !c.livePresence.statusText.toLowerCase().includes('open for') &&
+                    !c.livePresence.statusText.toLowerCase().includes('verified identity')
+                      ? c.livePresence.statusText
+                      : `Active Profile · ${c.name}`,
+                }
+              : undefined,
+            storySpotlight: c.storySpotlight
+              ? {
+                  ...c.storySpotlight,
+                  ctaLabel: undefined,
+                  ctaUrl: undefined,
+                }
+              : undefined,
+          };
+        });
+        return ensureAllCardsSecurityTraceability(sanitizedCards);
       } catch {
-        return DEFAULT_DIGITAL_CARDS;
+        return ensureAllCardsSecurityTraceability(DEFAULT_DIGITAL_CARDS);
       }
     }
-    return DEFAULT_DIGITAL_CARDS;
+    return ensureAllCardsSecurityTraceability(DEFAULT_DIGITAL_CARDS);
   });
 
   const [activeCardId, setActiveCardId] = useState<string>(() => {
@@ -789,6 +800,16 @@ export default function App() {
 
   const handleSelectCard = (card: DigitalCard) => {
     setActiveCardId(card.id);
+    const matchingPersona = personas.find(
+      (p) =>
+        p.id === card.id ||
+        p.id.replace('persona-', '') === card.id.replace('card-', '') ||
+        p.tag?.toLowerCase() === card.tag?.toLowerCase() ||
+        p.circleName?.toLowerCase() === card.name?.toLowerCase()
+    );
+    if (matchingPersona) {
+      setActivePersonaId(matchingPersona.id);
+    }
   };
 
   const handleUpdateProfile = (updated: MasterProfile) => {
@@ -801,33 +822,8 @@ export default function App() {
         (b, idx, arr) => b?.url && arr.findIndex((x) => x?.url?.trim() === b.url.trim()) === idx
       ),
     };
-    const hasKycTrace = Boolean(
-      dedupedUpdated.isVerified &&
-        dedupedUpdated.kycVerification?.isCompleted &&
-        dedupedUpdated.kycVerification?.traceabilityId
-    );
     setPersonas((prev) =>
-      prev.map((p) => {
-        if (p.id === dedupedUpdated.id) return dedupedUpdated;
-        // Propagate KYC registration & green verified tick across all of the user's identity circles
-        if (hasKycTrace) {
-          return {
-            ...p,
-            isVerified: true,
-            verifiedAt: updated.verifiedAt,
-            kycVerification: updated.kycVerification,
-          };
-        }
-        if (!updated.isVerified && !updated.kycVerification) {
-          return {
-            ...p,
-            isVerified: false,
-            verifiedAt: undefined,
-            kycVerification: undefined,
-          };
-        }
-        return p;
-      })
+      prev.map((p) => (p.id === dedupedUpdated.id ? dedupedUpdated : p))
     );
   };
 
@@ -923,14 +919,18 @@ export default function App() {
       currentProfile.workData?.phone ||
       '';
 
-    const populatedCard: DigitalCard = {
-      ...newCard,
-      holderFirstName: newCard.holderFirstName || defaultFirst || undefined,
-      holderLastName: newCard.holderLastName || defaultLast || undefined,
-      holderFullName: newCard.holderFullName || defaultFull || undefined,
-      holderEmail: newCard.holderEmail || defaultEmail || undefined,
-      holderPhone: newCard.holderPhone || defaultPhone || undefined,
-    };
+    const populatedCard: DigitalCard = ensureCardSecurityTraceability(
+      {
+        ...newCard,
+        holderFirstName: newCard.holderFirstName || defaultFirst || undefined,
+        holderLastName: newCard.holderLastName || defaultLast || undefined,
+        holderFullName: newCard.holderFullName || defaultFull || undefined,
+        holderEmail: newCard.holderEmail || defaultEmail || undefined,
+        holderPhone: newCard.holderPhone || defaultPhone || undefined,
+      },
+      authUser?.uid,
+      authUser?.email
+    );
 
     setCards((prev) => [...prev, populatedCard]);
     setActiveCardId(populatedCard.id);
@@ -950,23 +950,29 @@ export default function App() {
   const handleDuplicateCard = (cardId: string) => {
     const cardToDup = cards.find((c) => c.id === cardId);
     if (!cardToDup) return;
-    const newCard: DigitalCard = {
-      ...cardToDup,
-      id: `card-${Date.now()}`,
-      name: `${cardToDup.name} (Copy)`,
-      vanitySlug: `${cardToDup.vanitySlug}-copy-${Math.floor(Math.random() * 1000)}`,
-    };
+    const newCard: DigitalCard = ensureCardSecurityTraceability(
+      {
+        ...cardToDup,
+        id: `card-${Date.now()}`,
+        name: `${cardToDup.name} (Copy)`,
+        vanitySlug: `${cardToDup.vanitySlug}-copy-${Math.floor(Math.random() * 1000)}`,
+        cardSecurityNumber: undefined,
+        securityTraceability: undefined,
+      },
+      authUser?.uid,
+      authUser?.email
+    );
     setCards((prev) => [...prev, newCard]);
     setActiveCardId(newCard.id);
   };
 
-  // Full Recursive Purge (GDPR Right to Erasure & Apple Guideline 5.1.1(v) — Local + Firebase Cloud + Server Registry & KYC Purge)
+  // Full Recursive Purge (GDPR Right to Erasure & Apple Guideline 5.1.1(v) — Local + Firebase Cloud + Server Registry Purge)
   const handleRecursivePurge = () => {
     const personaIds = personas.map((p) => p.id);
     const cardIds = cards.map((c) => c.id);
     const vanitySlugs = cards.map((c) => c.vanitySlug).filter(Boolean) as string[];
-    const traceabilityIds = personas
-      .map((p) => p.kycVerification?.traceabilityId)
+    const traceabilityIds = cards
+      .map((c) => c.cardSecurityNumber)
       .filter(Boolean) as string[];
 
     deleteFirebaseAccountAndCloudData({
