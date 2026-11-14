@@ -176,7 +176,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   const [isPortraitVaultOpen, setIsPortraitVaultOpen] = useState(false);
   const [isBackgroundVaultOpen, setIsBackgroundVaultOpen] = useState(false);
   const [portraitVaultAnchorUrl, setPortraitVaultAnchorUrl] = useState<string>(
-    () => profile.avatarUrl?.trim() || ''
+    () => activeCard.avatarUrl?.trim() || profile.avatarUrl?.trim() || ''
   );
   const [backgroundVaultAnchorUrl, setBackgroundVaultAnchorUrl] = useState<string>(
     () => activeCard.coverBannerUrl?.trim() || ''
@@ -186,9 +186,9 @@ export const CardStudio: React.FC<CardStudioProps> = ({
   // different images while the vault is open keeps every image in its exact place.
   useEffect(() => {
     if (!isPortraitVaultOpen) {
-      setPortraitVaultAnchorUrl(profile.avatarUrl?.trim() || '');
+      setPortraitVaultAnchorUrl(activeCard.avatarUrl?.trim() || profile.avatarUrl?.trim() || '');
     }
-  }, [isPortraitVaultOpen, profile.avatarUrl]);
+  }, [isPortraitVaultOpen, activeCard.avatarUrl, profile.avatarUrl]);
 
   useEffect(() => {
     if (!isBackgroundVaultOpen) {
@@ -200,7 +200,7 @@ export const CardStudio: React.FC<CardStudioProps> = ({
     setIsPortraitVaultOpen((prev) => {
       const next = typeof forceState === 'boolean' ? forceState : !prev;
       if (next && !prev) {
-        setPortraitVaultAnchorUrl(profile.avatarUrl?.trim() || '');
+        setPortraitVaultAnchorUrl(activeCard.avatarUrl?.trim() || profile.avatarUrl?.trim() || '');
       }
       return next;
     });
@@ -1252,15 +1252,15 @@ export const CardStudio: React.FC<CardStudioProps> = ({
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="relative shrink-0">
-                {profile.avatarUrl ? (
+                {(activeCard.avatarUrl || profile.avatarUrl) ? (
                   <img
-                    src={profile.avatarUrl}
+                    src={activeCard.avatarUrl || profile.avatarUrl}
                     alt={activeCard.name}
                     className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover border border-indigo-400/50"
                   />
                 ) : (
                   <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-indigo-950 border border-indigo-400/50 flex items-center justify-center text-[10px] font-bold text-indigo-200 uppercase">
-                    {(profile.name || 'YC')
+                    {(activeCard.name || profile.name || 'YC')
                       .trim()
                       .split(/\s+/)
                       .map((p) => p[0])
@@ -5524,6 +5524,8 @@ export const CardStudio: React.FC<CardStudioProps> = ({
         subscription={subscription}
         onConsumeAiCoin={onConsumeAiCoin}
         onOpenSubscriptionModal={onOpenSubscriptionModal}
+        activeCard={activeCard}
+        onUpdateCard={onUpdateCard}
       />
 
       {/* Create New Persona / Circle Modal */}

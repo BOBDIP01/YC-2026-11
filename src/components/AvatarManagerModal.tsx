@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MasterProfile, StoredPicture, SubscriptionState, AiUsageType } from '../types';
+import { MasterProfile, DigitalCard, StoredPicture, SubscriptionState, AiUsageType } from '../types';
 import { enhancePhotoWithAI } from '../utils/aiPhotoEnhancer';
 import {
   getQuotaSummary,
@@ -49,6 +49,8 @@ interface AvatarManagerModalProps {
   subscription?: SubscriptionState;
   onConsumeAiCoin?: (usageType: AiUsageType, actionLabel: string) => boolean;
   onOpenSubscriptionModal?: (reason?: string) => void;
+  activeCard?: DigitalCard;
+  onUpdateCard?: (updated: DigitalCard) => void;
 }
 
 export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
@@ -60,6 +62,8 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
   subscription,
   onConsumeAiCoin,
   onOpenSubscriptionModal,
+  activeCard,
+  onUpdateCard,
 }) => {
   const [activeTab, setActiveTab] = useState<'vault' | 'library' | 'camera' | 'ai'>(initialTab);
   
@@ -331,6 +335,13 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
       previousAvatarUrl: undefined,
       avatarUrl: pic.url,
     });
+    if (activeCard && onUpdateCard) {
+      onUpdateCard({
+        ...activeCard,
+        avatarUrl: pic.url,
+        previousAvatarUrl: activeCard.avatarUrl || profile.avatarUrl,
+      });
+    }
     onClose();
   };
 
@@ -372,6 +383,13 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
         avatarUrl: dataUrl,
         storedPictures: updatedVault,
       });
+      if (activeCard && onUpdateCard) {
+        onUpdateCard({
+          ...activeCard,
+          avatarUrl: dataUrl,
+          previousAvatarUrl: activeCard.avatarUrl || profile.avatarUrl,
+        });
+      }
       setErrorMsg(null);
     };
     reader.readAsDataURL(file);
@@ -415,6 +433,13 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
         avatarUrl: capturedPhoto,
         storedPictures: updatedVault,
       });
+      if (activeCard && onUpdateCard) {
+        onUpdateCard({
+          ...activeCard,
+          avatarUrl: capturedPhoto,
+          previousAvatarUrl: activeCard.avatarUrl || profile.avatarUrl,
+        });
+      }
       onClose();
     } else if (mode === 'vault-only') {
       onUpdateProfile({
@@ -449,6 +474,12 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
       storedPictures: updatedVault,
       storedBanners: updatedBanners,
     });
+    if (activeCard && onUpdateCard && targetItem && activeCard.avatarUrl === targetItem.url) {
+      onUpdateCard({
+        ...activeCard,
+        avatarUrl: wasActiveAvatar ? fallbackAvatar : undefined,
+      });
+    }
   };
 
   const handleUndoDeletePicture = () => {
@@ -478,6 +509,12 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
       storedPictures: restoredVault,
       storedBanners: restoredBanners,
     });
+    if (activeCard && onUpdateCard && lastDeleted.wasActiveAvatar) {
+      onUpdateCard({
+        ...activeCard,
+        avatarUrl: lastDeleted.item.url,
+      });
+    }
   };
 
   // 6. Generate or Modify with AI (Strict Facial Likeness Preservation)
@@ -675,6 +712,13 @@ export const AvatarManagerModal: React.FC<AvatarManagerModalProps> = ({
       avatarUrl: generatedPreview.url,
       storedPictures: updatedVault,
     });
+    if (activeCard && onUpdateCard) {
+      onUpdateCard({
+        ...activeCard,
+        avatarUrl: generatedPreview.url,
+        previousAvatarUrl: activeCard.avatarUrl || profile.avatarUrl,
+      });
+    }
     setIsEnlargedOpen(false);
     onClose();
   };

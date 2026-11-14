@@ -248,7 +248,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 space-y-2">
               <div className="text-slate-300 font-semibold">Recipient Landing Page Preview:</div>
               <div className="flex items-center gap-3 text-slate-400">
-                <img src={profile.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover border border-white/20" />
+                <img src={card?.avatarUrl || profile.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover border border-white/20" />
                 <div>
                   <div className="text-white font-medium">{profile.name}</div>
                   <div className="text-[11px]">{profile.role} · {profile.company}</div>
